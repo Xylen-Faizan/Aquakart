@@ -1,0 +1,4 @@
+[functions.razorpay-payment]
+name = "razorpay-payment"
+description = "Handle Razorpay payments"
+entrypoint = "index.ts"

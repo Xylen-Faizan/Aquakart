@@ -1,0 +1,17 @@
+{
+  "statusCode": 401,
+  "headers": {
+    "date": "Thu, 31 Jul 2025 05:17:53 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "content-length": "76",
+    "connection": "keep-alive",
+    "strict-transport-security": "max-age=315360000; includeSubDomains",
+    "x-xss-protection": "0"
+  },
+  "body": {
+    "error": {
+      "description": "Authentication failed",
+      "code": "BAD_REQUEST_ERROR"
+    }
+  }
+}

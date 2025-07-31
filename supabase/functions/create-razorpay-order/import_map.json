@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "https://deno.land/std@0.177.0/http/server.ts": "https://deno.land/std@0.177.0/http/server.ts",
+    "razorpay": "https://esm.sh/razorpay@2.8.6"
+  }
+}

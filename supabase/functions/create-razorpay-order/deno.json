@@ -1,0 +1,21 @@
+{
+  "name": "create-razorpay-order",
+  "version": "1.0.0",
+  "imports": {
+    "@supabase/functions-js": "https://esm.sh/@supabase/functions-js@2.4.4",
+    "razorpay": "https://esm.sh/razorpay@2.8.6"
+  },
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window", "esnext", "dom"],
+    "strict": true
+  },
+  "tasks": {
+    "dev": "supabase functions serve create-razorpay-order --no-verify-jwt",
+    "start": "deno run --allow-net --allow-env --allow-read --allow-run --allow-write --unstable-kv index.ts"
+  },
+  "lint": {
+    "include": ["**/*.ts"],
+    "exclude": ["**/node_modules"]
+  }
+}

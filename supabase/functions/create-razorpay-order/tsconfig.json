@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "es2021",
+    "module": "esnext",
+    "lib": ["es2021", "deno.window"],
+    "types": ["@supabase/functions-js"],
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "./deno.lock"]
+}
