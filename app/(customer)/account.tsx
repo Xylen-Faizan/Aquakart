@@ -324,15 +324,9 @@ export default function AccountScreen() {
     },
   ];
 
-  // Render a section header if needed
+  // Section header rendering (currently unused, kept for future use)
   const renderSectionHeader = (section: { type: SectionType }) => {
-    if (section.type === 'options') {
-      return (
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>Account Options</Text>
-        </View>
-      );
-    }
+    // No section headers needed as per design requirements
     return null;
   };
 
