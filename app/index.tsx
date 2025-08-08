@@ -13,7 +13,7 @@ export default function Index() {
         
         if (user?.id && user.role) {
           // User is authenticated and has a role, redirect to their dashboard
-          const rolePath = `/${user.role}` as const;
+          const rolePath = `/${user.role}` as any;
           router.replace(rolePath);
         } else if (user?.id && !user.role) {
           // User is authenticated but has no role, go to role selection

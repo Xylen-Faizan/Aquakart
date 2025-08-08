@@ -1,9 +1,8 @@
-import { Platform } from 'react-native';
 import { LocationCoords } from './types/location';
 import { locationService } from './location';
 
 // Note: In a production app, you should store this in an environment variable
-const GOOGLE_PLACES_API_KEY = 'AIzaSyD5NPXlGtZfK4PcY696dSSCDq8QGTCzrz0';
+const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_Maps_API_KEY;
 
 export interface PlacePrediction {
   description: string;
@@ -33,7 +32,7 @@ export interface PlaceDetails {
 
 class PlacesService {
   private baseUrl = 'https://maps.googleapis.com/maps/api/place';
-  private locationService: locationService;
+  private locationService: typeof locationService;
 
   constructor() {
     this.locationService = locationService;
@@ -89,36 +88,15 @@ class PlacesService {
    * Get current device location
    */
   async getCurrentLocation() {
-    try {
-      const { location, error } = await this.locationService.getCurrentLocation();
-      
-      if (error || !location) {
-        return { error: error?.message || 'Failed to get current location' };
-      }
-      
-      return { location };
-    } catch (error: any) {
-      console.error('Error getting current location:', error);
-      return { error: error?.message || 'Failed to get current location' };
-    }
+    return this.locationService.getCurrentLocation();
   }
 
   /**
    * Reverse geocode coordinates to address
    */
   async reverseGeocode(coords: LocationCoords) {
-    try {
-      const { address, error } = await this.locationService.reverseGeocode(coords);
-      
-      if (error || !address) {
-        return { error: error?.message || 'Failed to reverse geocode location' };
-      }
-      
-      return { address };
-    } catch (error: any) {
-      console.error('Error reverse geocoding:', error);
-      return { error: error?.message || 'Failed to reverse geocode location' };
-    }
+    // We can enhance this to use Google Places API for better accuracy
+    return this.locationService.reverseGeocode(coords);
   }
 
   /**

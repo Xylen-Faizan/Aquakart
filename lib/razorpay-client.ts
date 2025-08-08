@@ -1,122 +1,83 @@
-import RazorpayCheckout from 'react-native-razorpay';
+import { supabase } from './supabase';
+import * as WebBrowser from 'expo-web-browser';
 import { Alert } from 'react-native';
-import { CartItem } from '@/app/(customer)/index';
-import { RazorpayService } from '@/src/services/razorpay';
 
-// Get the Razorpay service instance
-const razorpayService = RazorpayService.getInstance();
-
-// Define payment response types
-interface PaymentSuccessResponse {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
+// This interface should match the items you expect in your cart
+interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
 }
 
-interface PaymentErrorResponse {
-  code: string;
-  description: string;
-  metadata?: {
-    payment_id?: string;
-    order_id?: string;
-  };
-}
+class RazorpayClient {
+  /**
+   * Handles the checkout process by creating a Razorpay order via a Supabase Edge Function
+   * and opening the checkout URL in an in-app browser.
+   */
+  async checkout(
+    cart: CartItem[],
+    customerDetails: { name: string; email: string; contact: string }
+  ): Promise<{ success: boolean; message?: string; orderId?: string; paymentId?: string }> {
 
-type PaymentResult = PaymentSuccessResponse | PaymentErrorResponse;
-
-interface CheckoutResult {
-  success: boolean;
-  message: string;
-  paymentId?: string;
-  orderId?: string;
-}
-
-export const razorpayClient = {
-  async checkout(cart: CartItem[]): Promise<CheckoutResult> {
-    if (!cart || !Array.isArray(cart) || cart.length === 0) {
-      return {
-        success: false,
-        message: 'Your cart is empty. Please add items before checking out.',
-      };
+    if (!cart || cart.length === 0) {
+      return { success: false, message: 'Your cart is empty.' };
     }
 
     try {
-      // Calculate total amount
-      const total = parseFloat(
-        cart
-          .reduce((sum, item) => sum + item.price * item.quantity, 0)
-          .toFixed(2)
-      );
-
-      // Create order on server
-      const order = await razorpayService.createOrder({
-        amount: total,
-        receipt: `order_${Date.now()}`,
-        notes: {
-          items: JSON.stringify(cart),
-          user: 'user_id', // In a real app, get from auth context
-          timestamp: new Date().toISOString(),
+      // 1. Call the Supabase Edge Function to create a Razorpay order
+      const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
+        body: {
+          cart,
+          customerDetails,
         },
       });
 
-      // Prepare Razorpay options
-      const options = razorpayService.getPaymentOptions(
-        order.orderId,
-        total,
-        `Order for ${cart.length} item${cart.length > 1 ? 's' : ''}`
-      );
+      if (error) {
+        throw new Error(error.message);
+      }
 
-      // Open Razorpay checkout
-      // Open Razorpay checkout with proper typing
-      const result = await RazorpayCheckout.open(options) as PaymentResult;
+      if (!data || !data.id || !data.checkout_url) {
+        throw new Error('Failed to create Razorpay order. Invalid response from server.');
+      }
 
-      // Handle payment result
-      if ('razorpay_payment_id' in result) {
-        // Payment successful
-        const { razorpay_payment_id, razorpay_order_id } = result;
-        
-        // Verify and process the payment
-        const verification = await razorpayService.handlePaymentSuccess(
-          razorpay_payment_id,
-          razorpay_order_id
-        );
+      const orderId = data.id;
+      const checkoutUrl = data.checkout_url;
 
-        return {
-          success: true,
-          message: verification.message,
-          paymentId: razorpay_payment_id,
-          orderId: razorpay_order_id,
-        };
-      } else {
-        // Payment failed or was canceled
-        const { code, description } = result;
-        console.error('Razorpay payment failed:', { code, description });
-        
+      // 2. Open the Razorpay checkout URL using expo-web-browser
+      const browserResult = await WebBrowser.openBrowserAsync(checkoutUrl);
+
+      // 3. Handle the browser result (this part is simplified)
+      // In a real app, you would use a callback URL and deep linking to verify the payment status.
+      // For now, we'll assume a closed browser means a completed or cancelled payment.
+      // You should verify payment status on your backend using webhooks.
+      if (browserResult.type === 'cancel' || browserResult.type === 'dismiss') {
         return {
           success: false,
-          message: `Payment failed: ${description || 'Unknown error'}`,
+          message: 'Payment was cancelled or dismissed.',
+          orderId,
         };
       }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      
-      // Handle specific error cases
-      let errorMessage = 'Failed to process your order. Please try again.';
-      
-      if (error instanceof Error) {
-        if (error.message.includes('network request failed')) {
-          errorMessage = 'Network error. Please check your internet connection.';
-        } else if (error.message.includes('Payment cancelled')) {
-          errorMessage = 'Payment was cancelled.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
+
+      // At this point, you can't be 100% sure the payment was successful without a webhook.
+      // This is an optimistic success response.
+      Alert.alert(
+        'Payment Processing',
+        'Your payment is being processed. You will be notified once confirmed.'
+      );
+
       return {
-        success: false,
-        message: errorMessage,
+        success: true,
+        message: 'Payment process initiated.',
+        orderId,
       };
+
+    } catch (error: any) {
+      console.error('Razorpay checkout error:', error);
+      Alert.alert('Checkout Error', error.message || 'An unknown error occurred during checkout.');
+      return { success: false, message: error.message };
     }
-  },
-};
+  }
+}
+
+export const razorpayClient = new RazorpayClient();

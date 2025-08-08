@@ -13,36 +13,28 @@ import { useRouter } from 'expo-router';
 // Mock favorite products data
 const favoriteProducts: Product[] = [
   {
-    id: 1,
+    id: '1',
     name: 'Aquafina',
     description: '20L Can',
     price: 65,
     size: '20L',
     rating: 4.5,
     deliveryTime: '12 mins',
-    image: 'https://everydaysure.in/water/assets/media/aquafina-20ltr.jpg',
+    image_url: 'https://everydaysure.in/water/assets/media/aquafina-20ltr.jpg',
     inStock: true,
-    vendor: {
-      name: 'Aquafina Store',
-      rating: 4.5,
-      distance: '0.5 km away'
-    }
+    vendor_id: 'vendor1'
   },
   {
-    id: 2,
+    id: '2',
     name: 'Bisleri',
     description: '20L Can',
     price: 85,
     size: '20L',
     rating: 4.3,
     deliveryTime: '15 mins',
-    image: 'https://www.bisleri.com/on/demandware.static/-/Sites-Bis-Catalog/default/dwff6a45f6/Product%20Images_Desktop/Bisleri/Bisleri20Litre/PDP/TwentyLiterFrontPage.png',
+    image_url: 'https://www.bisleri.com/on/demandware.static/-/Sites-Bis-Catalog/default/dwff6a45f6/Product%20Images_Desktop/Bisleri/Bisleri20Litre/PDP/TwentyLiterFrontPage.png',
     inStock: true,
-    vendor: {
-      name: 'Bisleri Store',
-      rating: 4.3,
-      distance: '1.2 km away'
-    }
+    vendor_id: 'vendor2'
   },
 ];
 
@@ -62,7 +54,7 @@ export default function FavoritesScreen() {
   ];
 
   // Cart functions
-  const handleUpdateQuantity = (productId: number, newQuantity: number) => {
+  const handleUpdateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
       handleRemoveItem(productId);
       return;
@@ -82,7 +74,7 @@ export default function FavoritesScreen() {
     });
   };
 
-  const handleRemoveItem = (productId: number) => {
+  const handleRemoveItem = (productId: string) => {
     setCart(prevCart => prevCart.filter(item => item.id !== productId));
   };
 
@@ -258,9 +250,6 @@ export default function FavoritesScreen() {
               </TouchableOpacity>
             </View>
             <Cart 
-              cart={cart} 
-              onUpdateQuantity={handleUpdateQuantity} 
-              onRemoveItem={handleRemoveItem}
               onCheckout={handleCheckout}
               onClose={() => setIsCartVisible(false)}
               isProcessing={isProcessing}

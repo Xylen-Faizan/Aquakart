@@ -42,6 +42,7 @@ import WaterScore from '@/components/WaterScore';
 import { useCart } from '@/contexts/CartContext';
 import { authService } from '@/lib/auth';
 import { locationService } from '@/lib/location';
+import { LocationCoords } from '@/lib/types/location';
 // LocationCoords type is now imported from authService
 
 // Define types

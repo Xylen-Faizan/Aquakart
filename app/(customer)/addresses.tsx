@@ -376,9 +376,8 @@ function Addresses() {
                                 <Text style={styles.label}>Address</Text>
                                 {/* Ensure your AddressAutocompleteProps allows these props */}
                                 <AddressAutocomplete
-                                    value={newAddress.address_line}
-                                    onChangeText={(text: string) => handleInputChange('address_line', text)}
-                                    onSelectAddress={handleAddressSelect}
+                                    initialAddress={newAddress.address_line}
+                                    onSelect={handleAddressSelect}
                                     placeholder="Search for an address"
                                 />
                             </View>
