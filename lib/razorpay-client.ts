@@ -11,66 +11,65 @@ interface CartItem {
 }
 
 class RazorpayClient {
-  /**
-   * Handles the checkout process by creating a Razorpay order via a Supabase Edge Function
-   * and opening the checkout URL in an in-app browser.
-   */
   async checkout(
     cart: CartItem[],
     customerDetails: { name: string; email: string; contact: string }
-  ): Promise<{ success: boolean; message?: string; orderId?: string; paymentId?: string }> {
-
+  ): Promise<{ success: boolean; message?: string; orderId?: string }> {
+    
     if (!cart || cart.length === 0) {
       return { success: false, message: 'Your cart is empty.' };
     }
 
     try {
       // 1. Call the Supabase Edge Function to create a Razorpay order
-      const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
+      // The 'body' object is crucial. It must contain a 'cart' property.
+      const { data: order, error } = await supabase.functions.invoke('create-razorpay-order', {
         body: {
           cart,
-          customerDetails,
         },
       });
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(`Edge Function returned a non-2xx status code: ${error.message}`);
       }
-
-      if (!data || !data.id || !data.checkout_url) {
+      
+      if (!order || !order.id) {
         throw new Error('Failed to create Razorpay order. Invalid response from server.');
       }
 
-      const orderId = data.id;
-      const checkoutUrl = data.checkout_url;
+      // 2. Open the Razorpay checkout URL
+      // We use your Razorpay Key ID, which is safe to expose on the client
+      const razorpayKeyId = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID;
+      
+      const options = {
+        key: razorpayKeyId,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.id,
+        name: 'AquaKart',
+        description: 'Water Delivery Service',
+        prefill: {
+          name: customerDetails.name,
+          email: customerDetails.email,
+          contact: customerDetails.contact,
+        },
+        theme: {
+          color: '#4F46E5', // Your app's theme color
+        },
+      };
 
-      // 2. Open the Razorpay checkout URL using expo-web-browser
+      // This URL construction is for opening the checkout in a web browser
+      const checkoutUrl = `https://api.razorpay.com/v1/checkout.html?options=${encodeURIComponent(JSON.stringify(options))}`;
+      
       const browserResult = await WebBrowser.openBrowserAsync(checkoutUrl);
 
-      // 3. Handle the browser result (this part is simplified)
-      // In a real app, you would use a callback URL and deep linking to verify the payment status.
-      // For now, we'll assume a closed browser means a completed or cancelled payment.
-      // You should verify payment status on your backend using webhooks.
       if (browserResult.type === 'cancel' || browserResult.type === 'dismiss') {
-        return {
-          success: false,
-          message: 'Payment was cancelled or dismissed.',
-          orderId,
-        };
+        return { success: false, message: 'Payment was cancelled.', orderId: order.id };
       }
 
-      // At this point, you can't be 100% sure the payment was successful without a webhook.
-      // This is an optimistic success response.
-      Alert.alert(
-        'Payment Processing',
-        'Your payment is being processed. You will be notified once confirmed.'
-      );
-
-      return {
-        success: true,
-        message: 'Payment process initiated.',
-        orderId,
-      };
+      // Optimistic success response.
+      // You should always verify the final payment status using Razorpay Webhooks.
+      return { success: true, message: 'Payment processing.', orderId: order.id };
 
     } catch (error: any) {
       console.error('Razorpay checkout error:', error);

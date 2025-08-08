@@ -1,179 +1,93 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Plus } from 'lucide-react-native';
+import { Product } from '@/app/(customer)';
+import { Star, Clock, Plus, Minus, Trash2, Heart } from 'lucide-react-native';
+import { useCart } from '@/contexts/CartContext';
 
-// Define the structure for the Product prop for type safety
-type Product = {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  image_url: string;
-  vendor_id: string;
-  size?: string;
-  deliveryTime?: string;
-  inStock?: boolean;
-};
-
-type ProductCardProps = {
+interface ProductCardProps {
   product: Product;
-  quantity?: number;
-  onUpdateQuantity?: (productId: string, newQuantity: number) => void;
-};
+  isFavorite: boolean;
+  onToggleFavorite: (productId: string, isCurrentlyFavorite: boolean) => void;
+}
 
-/**
- * A visually appealing card to display a single product.
- * Includes product image, name, price, and an 'Add to Cart' button.
- */
-export default function ProductCard({ product, quantity = 0, onUpdateQuantity }: ProductCardProps) {
-  // Handle image loading with better error handling
-  const [imageError, setImageError] = React.useState(false);
-  const [imageUrl, setImageUrl] = React.useState(() => {
-    // Use image_url with fallback to placeholder
-    return product.image_url || `https://via.placeholder.com/400x400/EBF4FF/3B82F6?text=${encodeURIComponent(product.name || 'Product')}`;
-  });
-
-  const handleImageError = () => {
-    if (!imageError) {
-      setImageError(true);
-      // Fallback to placeholder with product name
-      setImageUrl(`https://via.placeholder.com/400x400/EBF4FF/3B82F6?text=${encodeURIComponent(product.name || 'Product')}`);
-    }
-  };
-
-  const handleAddToCart = () => {
-    if (onUpdateQuantity) {
-      onUpdateQuantity(product.id, quantity + 1);
-    }
-  };
+const ProductCard: React.FC<ProductCardProps> = ({ product, isFavorite, onToggleFavorite }) => {
+  const { cart, addToCart, updateQuantity } = useCart();
+  const cartItem = cart.find(item => item.id === product.id);
+  const quantity = cartItem?.quantity || 0;
 
   return (
-    <View style={styles.cardContainer}>
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: imageUrl }}
-          style={styles.productImage}
-          resizeMode="contain"
-          onError={handleImageError}
-          onLoadStart={() => console.log('Loading image:', imageUrl)}
-          onLoadEnd={() => console.log('Image loaded:', imageUrl)}
+    <View style={styles.card}>
+      <View>
+        <Image 
+          source={{ uri: product.image_url || 'https://placehold.co/400x400/EBF4FF/3B82F6?text=Image' }} 
+          style={styles.image} 
         />
+        <TouchableOpacity 
+          style={styles.favoriteButton} 
+          onPress={() => onToggleFavorite(product.id, isFavorite)}
+        >
+          <Heart size={20} color={isFavorite ? '#EF4444' : '#94A3B8'} fill={isFavorite ? '#EF4444' : 'none'}/>
+        </TouchableOpacity>
       </View>
-      <View style={styles.infoContainer}>
-        <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
-        <View style={styles.priceContainer}>
-          <Text style={styles.productPrice}>₹{product.price.toFixed(2)}</Text>
-          {quantity > 0 ? (
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity 
-                style={styles.quantityButton}
-                onPress={() => onUpdateQuantity && onUpdateQuantity(product.id, Math.max(0, quantity - 1))}
-              >
-                <Text style={styles.quantityButtonText}>-</Text>
+      
+      <View style={styles.detailsContainer}>
+        <View style={styles.deliveryTimeContainer}>
+          <Clock size={14} color="#3B82F6" />
+          <Text style={styles.deliveryTime}>{product.delivery_time || '30 min'}</Text>
+        </View>
+
+        <Text style={styles.name}>{product.name}</Text>
+        <Text style={styles.description}>{product.size}</Text>
+        
+        <View style={styles.footer}>
+          <View>
+            <Text style={styles.price}>₹{product.price}</Text>
+            <View style={styles.ratingContainer}>
+              <Star size={14} color="#F59E0B" fill="#F59E0B" />
+              <Text style={styles.rating}>{product.rating || '4.5'}</Text>
+            </View>
+          </View>
+          
+          {quantity === 0 ? (
+            <TouchableOpacity style={styles.addButton} onPress={() => addToCart(product)}>
+              <Text style={styles.addButtonText}>ADD</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.quantityControl}>
+              <TouchableOpacity onPress={() => updateQuantity(product.id, quantity - 1)} style={styles.quantityButton}>
+                {quantity === 1 ? <Trash2 size={16} color="#EF4444" /> : <Minus size={16} color="#3B82F6" />}
               </TouchableOpacity>
               <Text style={styles.quantityText}>{quantity}</Text>
-              <TouchableOpacity 
-                style={styles.quantityButton}
-                onPress={() => onUpdateQuantity && onUpdateQuantity(product.id, quantity + 1)}
-              >
-                <Text style={styles.quantityButtonText}>+</Text>
+              <TouchableOpacity onPress={() => updateQuantity(product.id, quantity + 1)} style={styles.quantityButton}>
+                <Plus size={16} color="#3B82F6" />
               </TouchableOpacity>
             </View>
-          ) : (
-            <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
-              <Plus size={20} color="#FFF" />
-            </TouchableOpacity>
           )}
         </View>
       </View>
     </View>
   );
-}
+};
 
+// Add the new favoriteButton style
 const styles = StyleSheet.create({
-  imageContainer: {
-    width: '100%',
-    height: 120,
-    backgroundColor: '#F3F4F6',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    margin: 8,
-    width: '45%',
-    overflow: 'hidden',
-  },
-  productImage: {
-    width: '100%',
-    height: 120,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  infoContainer: {
-    padding: 12,
-  },
-  productName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  productPrice: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 16,
-    padding: 4,
-  },
-  quantityButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quantityButtonText: {
-    fontSize: 18,
-    color: '#1F2937',
-    fontWeight: 'bold',
-    lineHeight: 20,
-  },
-  quantityText: {
-    marginHorizontal: 12,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    minWidth: 20,
-    textAlign: 'center',
-  },
+  card: { backgroundColor: '#FFF', borderRadius: 12, flexDirection: 'row', padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, overflow: 'hidden', },
+  image: { width: 80, height: 80, borderRadius: 8, resizeMode: 'contain', backgroundColor: '#F8FAFC', },
+  favoriteButton: { position: 'absolute', top: -4, right: -4, backgroundColor: 'rgba(255, 255, 255, 0.8)', padding: 6, borderRadius: 16 },
+  detailsContainer: { flex: 1, marginLeft: 12, justifyContent: 'space-between', },
+  deliveryTimeContainer: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EFF6FF', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start', },
+  deliveryTime: { fontSize: 10, fontWeight: '600', color: '#3B82F6', },
+  name: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginTop: 4, },
+  description: { fontSize: 12, color: '#64748B', marginTop: 2, },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, },
+  price: { fontSize: 16, fontWeight: '700', color: '#111827', },
+  ratingContainer: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, },
+  rating: { fontSize: 12, color: '#64748B', fontWeight: '500', },
+  addButton: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 8, paddingHorizontal: 24, paddingVertical: 8, },
+  addButtonText: { color: '#16A34A', fontWeight: '600', fontSize: 14, },
+  quantityControl: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 8, },
+  quantityButton: { padding: 8, },
+  quantityText: { fontSize: 16, fontWeight: '600', color: '#16A34A', minWidth: 20, textAlign: 'center', },
 });
+
+export default ProductCard;

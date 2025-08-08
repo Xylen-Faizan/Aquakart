@@ -1,162 +1,98 @@
-// Import required types
-import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
-import Razorpay from 'https://esm.sh/razorpay@2.8.6';
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Razorpay from 'https://esm.sh/razorpay@2.9.2';
 
-// Enable TypeScript DOM types
-declare const Deno: any;
-declare const console: Console;
+// --- IMPORTANT ---
+// Make sure these are set as environment variables in your Supabase function's Secrets tab.
+const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID')!;
+const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')!;
 
-// Define types
-interface OrderRequest {
-  amount: number;
-  currency?: string;
-  receipt?: string;
-  notes?: Record<string, string>;
-}
-
-interface OrderResponse {
+interface CartItem {
   id: string;
-  amount: number;
-  currency: string;
-  receipt: string;
-  status: string;
-  created_at: number;
+  price: number;
+  quantity: number;
 }
-
-interface ErrorResponse {
-  error: string;
-  details?: string | null;
-}
+// Define a type for the product data we fetch from the database
+type ProductPrice = {
+  id: string;
+  price: number;
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Get environment variables
-const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID');
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET');
-
-// Validate environment variables
-if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-  console.error('Missing required environment variables: RAZORPAY_KEY_ID and/or RAZORPAY_KEY_SECRET');
-  console.error('Please set these environment variables:');
-  console.error('$env:RAZORPAY_KEY_ID="your_key_id"');
-  console.error('$env:RAZORPAY_KEY_SECRET="your_key_secret"');
-  Deno.exit(1);
-}
-
-// Initialize Razorpay client
-const razorpay = new Razorpay({
-  key_id: RAZORPAY_KEY_ID,
-  key_secret: RAZORPAY_KEY_SECRET,
-});
-
-// Main handler function
-async function handleRequest(req: Request): Promise<Response> {
-  // Handle CORS preflight
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Parse request body
-    let requestData: OrderRequest;
-    try {
-      requestData = await req.json() as OrderRequest;
-    } catch (e) {
-      return createErrorResponse('Invalid request body', 400);
-    }
-    
-    const { amount, currency = 'INR', receipt, notes } = requestData;
+    const body = await req.json();
+    console.log("Received payload:", JSON.stringify(body, null, 2));
 
-    if (!amount) {
-      return createErrorResponse('Amount is required', 400);
-    }
-
- // Validate amount
-    if (isNaN(amount) || amount <= 0) {
-      return createErrorResponse('Amount must be a positive number', 400);
-    }
-
-    // Create order in Razorpay
-    console.log('Creating Razorpay order with amount:', amount);
-    let order;
-    try {
-      order = await razorpay.orders.create({
-        amount: Math.round(amount * 100), // Convert to paise
-        currency,
-        receipt: receipt || `order_rcpt_${Date.now()}`,
-        notes,
-        payment_capture: 1, // Auto-capture payment
+    const { cart } = body;
+    if (!cart || !Array.isArray(cart) || cart.length === 0) {
+      console.error("Validation failed: Cart is missing or empty.", body);
+      return new Response(JSON.stringify({ error: 'Cart is missing, not an array, or empty.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-      console.log('Razorpay order created:', order);
-    } catch (error) {
-      console.error('Error creating Razorpay order:', error);
-      if (error.response) {
-        console.error('Razorpay API error:', await error.response.text());
-      }
-      throw error;
     }
 
-    const response: OrderResponse = {
-      id: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      receipt: order.receipt,
-      status: order.status,
-      created_at: order.created_at,
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'User not authenticated' }), { status: 401, headers: corsHeaders });
+    }
+
+    const productIds = cart.map((item: CartItem) => item.id);
+    const { data: products, error: productError } = await supabase
+      .from('products')
+      .select('id, price')
+      .in('id', productIds);
+
+    if (productError) throw productError;
+
+    let totalAmount = 0;
+    for (const item of cart) {
+      // FIX: Explicitly type 'p' to avoid the 'implicit any' error.
+      const product = products.find((p: ProductPrice) => p.id === item.id);
+      if (!product) throw new Error(`Product with id ${item.id} not found.`);
+      totalAmount += product.price * item.quantity;
+    }
+
+    const razorpay = new Razorpay({
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
+    });
+
+    const options = {
+      amount: Math.round(totalAmount * 100),
+      currency: 'INR',
+      receipt: `receipt_order_${new Date().getTime()}`,
     };
 
-    return new Response(
-      JSON.stringify(response),
-      { 
-        status: 200, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS'
-        } 
-      }
-    );
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in request handler:', error);
-    
-    // Add more detailed error information
-    let details = errorMessage;
-    if (error instanceof Error && error.stack) {
-      console.error('Error stack:', error.stack);
-    }
-    
-    return createErrorResponse(
-      'Failed to create order',
-      500,
-      details
-    );
+    const order = await razorpay.orders.create(options);
+    console.log("Successfully created Razorpay order:", order.id);
+
+    return new Response(JSON.stringify(order), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error("Caught error:", error);
+    // FIX: Safely handle the 'unknown' error type in the catch block.
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
-}
-
-// Helper function to create error responses
-function createErrorResponse(
-  error: string, 
-  status: number, 
-  details?: string
-): Response {
-  const response: ErrorResponse = { error };
-  if (details) response.details = details;
-  
-  return new Response(
-    JSON.stringify(response),
-    { 
-      status, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    }
-  );
-}
-
-// Start the server
-const port = parseInt(Deno.env.get('PORT') || '54321');
-console.log(`Razorpay Edge Function started on port ${port}`);
-
-await serve(handleRequest, { port });
+});
