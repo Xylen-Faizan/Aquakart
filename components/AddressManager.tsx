@@ -37,8 +37,8 @@ interface AddressManagerProps {
 export default function AddressManager({ onAddressSelected }: AddressManagerProps) {
   const [loading, setLoading] = useState(true);
   const [addresses, setAddresses] = useState<Address[]>([]);
-  // Show form by default only if there are no addresses (new account)
-  const [showAddForm, setShowAddForm] = useState(addresses.length === 0);
+  // Only show form when explicitly requested by the user
+  const [showAddForm, setShowAddForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [saving, setSaving] = useState(false);
   const [newAddress, setNewAddress] = useState({
@@ -50,7 +50,15 @@ export default function AddressManager({ onAddressSelected }: AddressManagerProp
   });
 
   useEffect(() => {
-    loadAddresses();
+    const loadInitialData = async () => {
+      await loadAddresses();
+      // If no addresses exist, show the add form
+      if (addresses.length === 0) {
+        setShowAddForm(true);
+      }
+    };
+    
+    loadInitialData();
   }, []);
 
   const loadAddresses = async () => {

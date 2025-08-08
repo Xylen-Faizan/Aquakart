@@ -1,8 +1,27 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Power, Clock, DollarSign, Package, TrendingUp, TriangleAlert as AlertTriangle, MapPin, Star, Bell } from 'lucide-react-native';
+import { 
+  Power, 
+  Clock, 
+  DollarSign, 
+  Package, 
+  TrendingUp, 
+  TriangleAlert as AlertTriangle, 
+  MapPin, 
+  Star, 
+  Bell,
+  Droplets,
+  Users,
+  Truck,
+  CheckCircle,
+  XCircle,
+  ArrowRight
+} from 'lucide-react-native';
+import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '@/src/design-system';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
 
 export default function VendorDashboard() {
   const [isOnline, setIsOnline] = useState(true);
@@ -16,10 +35,10 @@ export default function VendorDashboard() {
   };
 
   const quickStats = [
-    { label: 'Orders Today', value: todayStats.orders, icon: Package, color: '#2563EB' },
-    { label: 'Earnings', value: `₹${todayStats.earnings}`, icon: DollarSign, color: '#059669' },
-    { label: 'Avg Time', value: `${todayStats.avgDeliveryTime}m`, icon: Clock, color: '#F59E0B' },
-    { label: 'Rating', value: todayStats.rating, icon: Star, color: '#EC4899' },
+    { label: 'Orders Today', value: todayStats.orders, icon: Package, color: colors.primary, change: '+12%' },
+    { label: 'Earnings', value: `₹${todayStats.earnings}`, icon: DollarSign, color: colors.success, change: '+8%' },
+    { label: 'Avg Time', value: `${todayStats.avgDeliveryTime}m`, icon: Clock, color: colors.warning, change: '-2m' },
+    { label: 'Rating', value: todayStats.rating, icon: Star, color: colors.info, change: '+0.2' },
   ];
 
   const recentOrders = [
@@ -53,17 +72,17 @@ export default function VendorDashboard() {
   ];
 
   const inventory = [
-    { brand: 'Aquafina 20L', stock: 5, lowStock: true },
-    { brand: 'Aquafina 1L', stock: 12, lowStock: false },
-    { brand: 'Bisleri 20L', stock: 3, lowStock: true },
+    { brand: 'Aquafina 20L', stock: 5, lowStock: true, image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=100' },
+    { brand: 'Aquafina 1L', stock: 12, lowStock: false, image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=100' },
+    { brand: 'Bisleri 20L', stock: 3, lowStock: true, image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=100' },
   ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'new': return '#EF4444';
-      case 'accepted': return '#F59E0B';
-      case 'delivering': return '#2563EB';
-      default: return '#6B7280';
+      case 'new': return colors.error;
+      case 'accepted': return colors.warning;
+      case 'delivering': return colors.primary;
+      default: return colors.textTertiary;
     }
   };
 
@@ -76,152 +95,206 @@ export default function VendorDashboard() {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'new': return AlertTriangle;
+      case 'accepted': return Clock;
+      case 'delivering': return Truck;
+      default: return Package;
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
+        <LinearGradient
+          colors={colors.primaryGradient as [string, string]}
+          style={styles.header}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
           <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.greeting}>Good Morning!</Text>
-              <Text style={styles.vendorName}>Raj Kumar</Text>
-            </View>
-            <TouchableOpacity style={styles.notificationButton}>
-              <Bell size={24} color="#1E293B" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationCount}>3</Text>
+            <View style={styles.headerTop}>
+              <View>
+                <Text style={styles.greeting}>Good Morning!</Text>
+                <Text style={styles.vendorName}>Raj Kumar</Text>
               </View>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.onlineToggle}>
-            <View style={styles.toggleInfo}>
-              <Power size={20} color={isOnline ? '#059669' : '#6B7280'} />
-              <Text style={styles.toggleText}>
-                {isOnline ? 'Online' : 'Offline'}
-              </Text>
+              <TouchableOpacity style={styles.notificationButton}>
+                <Bell size={24} color={colors.white} />
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationCount}>3</Text>
+                </View>
+              </TouchableOpacity>
             </View>
-            <Switch
-              value={isOnline}
-              onValueChange={setIsOnline}
-              trackColor={{ false: '#E5E7EB', true: '#DCFCE7' }}
-              thumbColor={isOnline ? '#059669' : '#9CA3AF'}
-            />
+            
+            <View style={styles.onlineToggle}>
+              <View style={styles.toggleInfo}>
+                <Power size={20} color={isOnline ? colors.success : colors.textTertiary} />
+                <Text style={styles.toggleText}>
+                  {isOnline ? 'Online' : 'Offline'}
+                </Text>
+              </View>
+              <Switch
+                value={isOnline}
+                onValueChange={setIsOnline}
+                trackColor={{ false: colors.gray300, true: colors.successLight }}
+                thumbColor={colors.white}
+              />
+            </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Quick Stats */}
         <View style={styles.statsContainer}>
-          {quickStats.map((stat, index) => (
-            <LinearGradient
-              key={index}
-              colors={[stat.color, stat.color + '90']}
-              style={styles.statCard}
-            >
-              <stat.icon size={24} color="#FFF" />
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </LinearGradient>
-          ))}
-        </View>
-
-        {/* Recent Orders */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Orders</Text>
-          <View style={styles.ordersList}>
-            {recentOrders.map((order) => (
-              <TouchableOpacity key={order.id} style={styles.orderCard}>
-                <View style={styles.orderHeader}>
-                  <Text style={styles.customerName}>{order.customer}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-                    <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
+          <View style={styles.statsGrid}>
+            {quickStats.map((stat, index) => (
+              <Card key={index} variant="default" style={styles.statCard}>
+                <View style={styles.statHeader}>
+                  <View style={[styles.statIcon, { backgroundColor: stat.color + '20' }]}>
+                    <stat.icon size={20} color={stat.color} />
                   </View>
+                  <Text style={[styles.statChange, { color: stat.change.startsWith('+') ? colors.success : colors.error }]}>
+                    {stat.change}
+                  </Text>
                 </View>
-                
-                <Text style={styles.orderItems}>{order.items}</Text>
-                
-                <View style={styles.orderFooter}>
-                  <View style={styles.addressContainer}>
-                    <MapPin size={14} color="#64748B" />
-                    <Text style={styles.orderAddress}>{order.address}</Text>
-                  </View>
-                  <View style={styles.orderMeta}>
-                    <Text style={styles.orderAmount}>₹{order.amount}</Text>
-                    <Text style={styles.orderTime}>{order.time}</Text>
-                  </View>
-                </View>
-                
-                {order.status === 'new' && (
-                  <View style={styles.orderActions}>
-                    <TouchableOpacity style={styles.rejectButton}>
-                      <Text style={styles.rejectText}>Reject</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.acceptButton}>
-                      <Text style={styles.acceptText}>Accept</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </TouchableOpacity>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </Card>
             ))}
           </View>
         </View>
 
-        {/* Inventory Status */}
+        {/* Recent Orders */}
         <View style={styles.section}>
-          <View style={styles.inventoryHeader}>
-            <Text style={styles.sectionTitle}>Inventory Status</Text>
-            <TouchableOpacity 
-              style={styles.lowStockToggle}
-              onPress={() => setShowLowStock(!showLowStock)}
-            >
-              <AlertTriangle size={16} color="#EF4444" />
-              <Text style={styles.lowStockText}>Low Stock</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Orders</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
           
-          <View style={styles.inventoryGrid}>
-            {inventory
-              .filter(item => !showLowStock || item.lowStock)
-              .map((item, index) => (
-                <View key={index} style={styles.inventoryCard}>
-                  <Text style={styles.brandName}>{item.brand}</Text>
-                  <Text style={[
-                    styles.stockCount,
-                    item.lowStock && styles.lowStockCount
-                  ]}>
-                    {item.stock} bottles
-                  </Text>
-                  {item.lowStock && (
-                    <View style={styles.lowStockBadge}>
-                      <AlertTriangle size={12} color="#EF4444" />
-                      <Text style={styles.lowStockLabel}>Low Stock</Text>
+          <View style={styles.ordersList}>
+            {recentOrders.map((order) => {
+              const StatusIcon = getStatusIcon(order.status);
+              return (
+                <Card key={order.id} variant="default" style={styles.orderCard}>
+                  <View style={styles.orderHeader}>
+                    <View style={styles.orderInfo}>
+                      <Text style={styles.customerName}>{order.customer}</Text>
+                      <Text style={styles.orderItems}>{order.items}</Text>
+                      <View style={styles.orderMeta}>
+                        <MapPin size={14} color={colors.textSecondary} />
+                        <Text style={styles.orderAddress}>{order.address}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.orderActions}>
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
+                        <StatusIcon size={14} color={getStatusColor(order.status)} />
+                        <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>
+                          {getStatusText(order.status)}
+                        </Text>
+                      </View>
+                      <Text style={styles.orderAmount}>₹{order.amount}</Text>
+                      <Text style={styles.orderTime}>{order.time}</Text>
+                    </View>
+                  </View>
+                  
+                  {order.status === 'new' && (
+                    <View style={styles.orderActions}>
+                      <Button
+                        title="Accept"
+                        onPress={() => {}}
+                        variant="primary"
+                        size="small"
+                        icon={<CheckCircle size={16} color={colors.white} />}
+                        style={styles.acceptButton}
+                      />
+                      <Button
+                        title="Reject"
+                        onPress={() => {}}
+                        variant="outline"
+                        size="small"
+                        icon={<XCircle size={16} color={colors.error} />}
+                        style={styles.rejectButton}
+                      />
                     </View>
                   )}
-                </View>
-              ))}
+                </Card>
+              );
+            })}
           </View>
         </View>
 
-        {/* Today's Performance */}
+        {/* Inventory Alert */}
+        {showLowStock && (
+          <View style={styles.section}>
+            <Card variant="elevated" style={styles.inventoryAlert}>
+              <View style={styles.alertHeader}>
+                <AlertTriangle size={20} color={colors.warning} />
+                <Text style={styles.alertTitle}>Low Stock Alert</Text>
+              </View>
+              <Text style={styles.alertDescription}>
+                Some items are running low on stock. Consider restocking soon.
+              </Text>
+              
+              <View style={styles.inventoryList}>
+                {inventory.filter(item => item.lowStock).map((item, index) => (
+                  <View key={index} style={styles.inventoryItem}>
+                    <View style={styles.inventoryInfo}>
+                      <Text style={styles.inventoryBrand}>{item.brand}</Text>
+                      <Text style={styles.inventoryStock}>Only {item.stock} left</Text>
+                    </View>
+                    <Button
+                      title="Restock"
+                      onPress={() => {}}
+                      variant="primary"
+                      size="small"
+                    />
+                  </View>
+                ))}
+              </View>
+            </Card>
+          </View>
+        )}
+
+        {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Performance</Text>
-          <View style={styles.performanceCard}>
-            <View style={styles.performanceRow}>
-              <Text style={styles.performanceLabel}>Orders Completed</Text>
-              <Text style={styles.performanceValue}>18/24</Text>
-            </View>
-            <View style={styles.performanceRow}>
-              <Text style={styles.performanceLabel}>Average Rating</Text>
-              <Text style={styles.performanceValue}>4.7 ⭐</Text>
-            </View>
-            <View style={styles.performanceRow}>
-              <Text style={styles.performanceLabel}>On-Time Delivery</Text>
-              <Text style={styles.performanceValue}>94%</Text>
-            </View>
-            <View style={styles.performanceRow}>
-              <Text style={styles.performanceLabel}>Tips Earned</Text>
-              <Text style={styles.performanceValue}>₹145</Text>
-            </View>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionsGrid}>
+            <TouchableOpacity style={styles.actionCard}>
+              <View style={styles.actionIcon}>
+                <Users size={24} color={colors.primary} />
+              </View>
+              <Text style={styles.actionTitle}>Manage Orders</Text>
+              <ArrowRight size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.actionCard}>
+              <View style={styles.actionIcon}>
+                <Droplets size={24} color={colors.secondary} />
+              </View>
+              <Text style={styles.actionTitle}>Inventory</Text>
+              <ArrowRight size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.actionCard}>
+              <View style={styles.actionIcon}>
+                <TrendingUp size={24} color={colors.success} />
+              </View>
+              <Text style={styles.actionTitle}>Analytics</Text>
+              <ArrowRight size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.actionCard}>
+              <View style={styles.actionIcon}>
+                <Truck size={24} color={colors.warning} />
+              </View>
+              <Text style={styles.actionTitle}>Deliveries</Text>
+              <ArrowRight size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -232,280 +305,286 @@ export default function VendorDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
   },
   header: {
-    backgroundColor: '#FFF',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    ...shadows.lg,
   },
   headerContent: {
+    gap: spacing.lg,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    alignItems: 'flex-start',
   },
   greeting: {
-    fontSize: 16,
-    color: '#64748B',
+    fontSize: typography.fontSize.base,
+    color: colors.white,
+    opacity: 0.9,
+    fontFamily: typography.fontFamily.regular,
   },
   vendorName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    fontFamily: typography.fontFamily.bold,
   },
   notificationButton: {
     position: 'relative',
-    padding: 8,
+    padding: spacing.sm,
   },
   notificationBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    right: spacing.xs,
+    top: spacing.xs,
+    backgroundColor: colors.error,
+    borderRadius: 8,
+    width: 16,
+    height: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   notificationCount: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFF',
+    fontSize: typography.fontSize.xs,
+    color: colors.white,
+    fontWeight: typography.fontWeight.bold,
+    fontFamily: typography.fontFamily.bold,
   },
   onlineToggle: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
   },
   toggleInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   toggleText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontSize: typography.fontSize.base,
+    color: colors.white,
+    fontWeight: typography.fontWeight.medium,
+    fontFamily: typography.fontFamily.medium,
   },
   statsContainer: {
+    padding: spacing.lg,
+    marginTop: -spacing.xl,
+  },
+  statsGrid: {
     flexDirection: 'row',
-    padding: 20,
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: spacing.md,
   },
   statCard: {
     flex: 1,
-    borderRadius: 12,
-    padding: 16,
+    minWidth: '45%',
+  },
+  statHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: spacing.sm,
+  },
+  statIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statChange: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    fontFamily: typography.fontFamily.medium,
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFF',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+    fontFamily: typography.fontFamily.bold,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#FFF',
-    opacity: 0.9,
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily.regular,
   },
   section: {
-    padding: 20,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 16,
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bold,
+  },
+  seeAllText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary,
+    fontWeight: typography.fontWeight.medium,
+    fontFamily: typography.fontFamily.medium,
   },
   ordersList: {
-    gap: 12,
+    gap: spacing.md,
   },
   orderCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: spacing.md,
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+  },
+  orderInfo: {
+    flex: 1,
+    gap: spacing.xs,
   },
   customerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFF',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.semibold,
   },
   orderItems: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 12,
-  },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  addressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  orderAddress: {
-    fontSize: 12,
-    color: '#64748B',
-    flex: 1,
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily.regular,
   },
   orderMeta: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  orderAmount: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  orderTime: {
-    fontSize: 12,
-    color: '#64748B',
+  orderAddress: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textTertiary,
+    fontFamily: typography.fontFamily.regular,
   },
   orderActions: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  statusBadge: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  rejectButton: {
-    flex: 1,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 8,
-    paddingVertical: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FECACA',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    gap: spacing.xs,
   },
-  rejectText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#EF4444',
+  statusText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    fontFamily: typography.fontFamily.medium,
+  },
+  orderAmount: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bold,
+  },
+  orderTime: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textTertiary,
+    fontFamily: typography.fontFamily.regular,
   },
   acceptButton: {
-    flex: 1,
-    backgroundColor: '#059669',
-    borderRadius: 8,
-    paddingVertical: 12,
+    backgroundColor: colors.success,
+  },
+  rejectButton: {
+    borderColor: colors.error,
+  },
+  inventoryAlert: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+  },
+  alertHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  acceptText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFF',
+  alertTitle: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.semibold,
   },
-  inventoryHeader: {
+  alertDescription: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    fontFamily: typography.fontFamily.regular,
+  },
+  inventoryList: {
+    gap: spacing.sm,
+  },
+  inventoryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  lowStockToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  inventoryInfo: {
+    gap: spacing.xs,
   },
-  lowStockText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#EF4444',
+  inventoryBrand: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.medium,
   },
-  inventoryGrid: {
+  inventoryStock: {
+    fontSize: typography.fontSize.xs,
+    color: colors.error,
+    fontFamily: typography.fontFamily.regular,
+  },
+  actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.md,
   },
-  inventoryCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    width: '48%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  brandName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  stockCount: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 8,
-  },
-  lowStockCount: {
-    color: '#EF4444',
-  },
-  lowStockBadge: {
-    flexDirection: 'row',
+  actionCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.sm,
+    ...shadows.sm,
   },
-  lowStockLabel: {
-    fontSize: 12,
-    color: '#EF4444',
-    fontWeight: '600',
-  },
-  performanceCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  performanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.gray100,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
-  performanceLabel: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  performanceValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
+  actionTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    fontFamily: typography.fontFamily.medium,
   },
 });

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "AquaFlow",
-    "slug": "aquaflow-water-delivery",
+    "name": "AquaKart",
+    "slug": "aquakart",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "aquaflow",
+    "scheme": "aquakart",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/icon.png",

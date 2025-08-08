@@ -1,55 +1,89 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { ShoppingCart, Plus, Minus } from 'lucide-react-native';
-import { Product } from '@/app/(customer)/index';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { Plus } from 'lucide-react-native';
 
-interface ProductCardProps {
+// Define the structure for the Product prop for type safety
+type Product = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  vendor_id: string;
+  size?: string;
+  deliveryTime?: string;
+  inStock?: boolean;
+};
+
+type ProductCardProps = {
   product: Product;
-  quantity: number;
-  onUpdateQuantity: (productId: number, newQuantity: number) => void;
-}
+  quantity?: number;
+  onUpdateQuantity?: (productId: string, newQuantity: number) => void;
+};
 
-export default function ProductCard({ product, quantity, onUpdateQuantity }: ProductCardProps) {
-  
+/**
+ * A visually appealing card to display a single product.
+ * Includes product image, name, price, and an 'Add to Cart' button.
+ */
+export default function ProductCard({ product, quantity = 0, onUpdateQuantity }: ProductCardProps) {
+  // Handle image loading with better error handling
+  const [imageError, setImageError] = React.useState(false);
+  const [imageUrl, setImageUrl] = React.useState(() => {
+    // Use image_url with fallback to placeholder
+    return product.image_url || `https://via.placeholder.com/400x400/EBF4FF/3B82F6?text=${encodeURIComponent(product.name || 'Product')}`;
+  });
+
+  const handleImageError = () => {
+    if (!imageError) {
+      setImageError(true);
+      // Fallback to placeholder with product name
+      setImageUrl(`https://via.placeholder.com/400x400/EBF4FF/3B82F6?text=${encodeURIComponent(product.name || 'Product')}`);
+    }
+  };
 
   const handleAddToCart = () => {
-    if (quantity === 0) {
-      onUpdateQuantity(product.id, 1);
+    if (onUpdateQuantity) {
+      onUpdateQuantity(product.id, quantity + 1);
     }
   };
 
   return (
-    <View style={styles.card}>
-      <Image source={{ uri: product.image }} style={styles.image} />
-      <View style={styles.detailsContainer}>
-        <Text style={styles.name}>{product.name}</Text>
-        <Text style={styles.description}>{product.description}</Text>
-        <Text style={styles.price}>₹{product.price.toFixed(2)}</Text>
-        
-        <View style={styles.actionsContainer}>
-          <View style={styles.quantityContainer}>
-            <TouchableOpacity 
-              style={styles.quantityButton} 
-              onPress={() => onUpdateQuantity(product.id, Math.max(0, quantity - 1))}
-            >
-              <Minus size={16} color="#3B82F6" />
+    <View style={styles.cardContainer}>
+      <View style={styles.imageContainer}>
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.productImage}
+          resizeMode="contain"
+          onError={handleImageError}
+          onLoadStart={() => console.log('Loading image:', imageUrl)}
+          onLoadEnd={() => console.log('Image loaded:', imageUrl)}
+        />
+      </View>
+      <View style={styles.infoContainer}>
+        <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
+        <View style={styles.priceContainer}>
+          <Text style={styles.productPrice}>₹{product.price.toFixed(2)}</Text>
+          {quantity > 0 ? (
+            <View style={styles.quantityContainer}>
+              <TouchableOpacity 
+                style={styles.quantityButton}
+                onPress={() => onUpdateQuantity && onUpdateQuantity(product.id, Math.max(0, quantity - 1))}
+              >
+                <Text style={styles.quantityButtonText}>-</Text>
+              </TouchableOpacity>
+              <Text style={styles.quantityText}>{quantity}</Text>
+              <TouchableOpacity 
+                style={styles.quantityButton}
+                onPress={() => onUpdateQuantity && onUpdateQuantity(product.id, quantity + 1)}
+              >
+                <Text style={styles.quantityButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
+              <Plus size={20} color="#FFF" />
             </TouchableOpacity>
-            <Text style={styles.quantityText}>{quantity}</Text>
-            <TouchableOpacity 
-              style={styles.quantityButton} 
-              onPress={() => onUpdateQuantity(product.id, quantity + 1)}
-            >
-              <Plus size={16} color="#3B82F6" />
-            </TouchableOpacity>
-          </View>
-          
-          <TouchableOpacity
-            style={styles.addToCartButton}
-            onPress={handleAddToCart}
-          >
-            <ShoppingCart size={16} color="#FFF" />
-            <Text style={styles.addToCartButtonText}>{quantity === 0 ? 'Add to Cart' : 'Added'}</Text>
-          </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
@@ -57,79 +91,89 @@ export default function ProductCard({ product, quantity, onUpdateQuantity }: Pro
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+  imageContainer: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#F3F4F6',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
-    width: '100%',
+    elevation: 3,
+    margin: 8,
+    width: '45%',
+    overflow: 'hidden',
   },
-  image: {
+  productImage: {
     width: '100%',
-    height: 160,
-    borderRadius: 8,
-    marginBottom: 12,
-    resizeMode: 'contain',
-    backgroundColor: '#F8FAFC',
+    height: 120,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
-  detailsContainer: {
-    width: '100%',
+  infoContainer: {
+    padding: 12,
   },
-  name: {
+  productName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
-  },
-  description: {
-    fontSize: 12,
-    color: '#64748B',
-    marginVertical: 4,
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#059669',
+    color: '#1F2937',
     marginBottom: 8,
+    alignItems: 'center',
   },
-  actionsContainer: {
+  priceContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+  },
+  productPrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  addButton: {
+    backgroundColor: '#3B82F6',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    padding: 4,
   },
   quantityButton: {
-    padding: 6,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityButtonText: {
+    fontSize: 18,
+    color: '#1F2937',
+    fontWeight: 'bold',
+    lineHeight: 20,
   },
   quantityText: {
+    marginHorizontal: 12,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
-  },
-  addToCartButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2563EB',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-  addToCartButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
-    fontSize: 14,
+    color: '#1F2937',
+    minWidth: 20,
+    textAlign: 'center',
   },
 });

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, MapPin, Star as StarIcon, Clock, Zap, Droplets, ShoppingCart, X, Heart } from 'lucide-react-native';
+import { Search, MapPin, Star as StarIcon, Clock, Zap, Droplets, ShoppingCart, X, Heart, AlertCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ProductCard from '@/components/ProductCard';
 import Cart from '@/components/Cart';
 import { Product, CartItem } from './index';
+import { razorpayClient } from '@/lib/razorpay-client';
+import { Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 
 // Mock favorite products data
 const favoriteProducts: Product[] = [
@@ -19,6 +22,11 @@ const favoriteProducts: Product[] = [
     deliveryTime: '12 mins',
     image: 'https://everydaysure.in/water/assets/media/aquafina-20ltr.jpg',
     inStock: true,
+    vendor: {
+      name: 'Aquafina Store',
+      rating: 4.5,
+      distance: '0.5 km away'
+    }
   },
   {
     id: 2,
@@ -30,6 +38,11 @@ const favoriteProducts: Product[] = [
     deliveryTime: '15 mins',
     image: 'https://www.bisleri.com/on/demandware.static/-/Sites-Bis-Catalog/default/dwff6a45f6/Product%20Images_Desktop/Bisleri/Bisleri20Litre/PDP/TwentyLiterFrontPage.png',
     inStock: true,
+    vendor: {
+      name: 'Bisleri Store',
+      rating: 4.3,
+      distance: '1.2 km away'
+    }
   },
 ];
 
@@ -39,6 +52,8 @@ export default function FavoritesScreen() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartVisible, setIsCartVisible] = useState(false);
   const [favorites, setFavorites] = useState<Product[]>(favoriteProducts);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const router = useRouter();
 
   const categories = [
     { id: 'all', name: 'All', icon: Droplets },
@@ -69,6 +84,52 @@ export default function FavoritesScreen() {
 
   const handleRemoveItem = (productId: number) => {
     setCart(prevCart => prevCart.filter(item => item.id !== productId));
+  };
+
+  const handleCheckout = async () => {
+    if (cart.length === 0) {
+      Alert.alert('Empty Cart', 'Your cart is empty. Please add items before checking out.');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const result = await razorpayClient.checkout(cart);
+      
+      if (result.success) {
+        // Clear cart on successful payment
+        setCart([]);
+        
+        // Show success message
+        Alert.alert(
+          'Order Placed!',
+          `Your order #${result.orderId} has been placed successfully. Payment ID: ${result.paymentId}`,
+          [
+            {
+              text: 'View Orders',
+              onPress: () => router.push('/orders'),
+              style: 'default',
+            },
+            {
+              text: 'Continue Shopping',
+              style: 'cancel',
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Payment Failed', result.message || 'There was an issue processing your payment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      Alert.alert(
+        'Error',
+        'An error occurred while processing your payment. Please try again later.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsProcessing(false);
+      setIsCartVisible(false);
+    }
   };
 
   const filteredFavorites = favorites.filter(product => 
@@ -199,7 +260,10 @@ export default function FavoritesScreen() {
             <Cart 
               cart={cart} 
               onUpdateQuantity={handleUpdateQuantity} 
-              onRemoveItem={handleRemoveItem} 
+              onRemoveItem={handleRemoveItem}
+              onCheckout={handleCheckout}
+              onClose={() => setIsCartVisible(false)}
+              isProcessing={isProcessing}
             />
           </View>
         </TouchableOpacity>

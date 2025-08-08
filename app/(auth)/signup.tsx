@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { User, Phone, Mail, Lock, MapPin, Eye, EyeOff, ArrowRight } from 'lucide-react-native';
-import { authService, showAuthError } from '@/lib/auth';
+import { authService, AuthError } from '@/lib/auth';
 
 export default function Signup() {
   const router = useRouter();
@@ -78,17 +78,22 @@ export default function Signup() {
       const result = await authService.signUp({
         email: formData.email,
         password: formData.password,
-        phone: formData.phone,
-        fullName: formData.fullName,
+        phone_number: formData.phone,
+        full_name: formData.fullName,
         role: userType,
       });
 
       setLoading(false);
 
-      if (result.success) {
+      if ('error' in result) {
+        // Handle AuthError case
+        console.error('Signup error details:', result.error);
+        Alert.alert('Signup Failed', result.error);
+      } else {
+        // If we get here, signup was successful
         Alert.alert(
           'Account Created',
-          `Your ${data.role} account has been created successfully. You can now login to your account.`,
+          `Your ${userType} account has been created successfully. You can now login to your account.`,
           [
             {
               text: 'OK',
@@ -96,9 +101,6 @@ export default function Signup() {
             },
           ]
         );
-      } else {
-        console.error('Signup error details:', result.error);
-        Alert.alert('Signup Failed', result.error?.message || 'Please try again. Check console for details.');
       }
     } catch (error: any) {
       setLoading(false);

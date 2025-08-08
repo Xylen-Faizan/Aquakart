@@ -1,15 +1,6 @@
 import * as Location from 'expo-location';
-import { Alert } from 'react-native';
-
-export interface LocationCoords {
-  latitude: number;
-  longitude: number;
-}
-
-export interface LocationError {
-  message: string;
-  code?: string;
-}
+import { Alert, Platform } from 'react-native';
+import { LocationCoords, LocationError } from './types/location';
 
 class LocationService {
   // Request location permissions
@@ -125,49 +116,103 @@ class LocationService {
     return degrees * (Math.PI / 180);
   }
 
-  // Reverse geocoding - get address from coordinates
+  // Reverse geocode coordinates to address using Google Places API
   async reverseGeocode(coords: LocationCoords): Promise<{ address?: string; error?: LocationError }> {
     try {
-      const result = await Location.reverseGeocodeAsync(coords);
+      // First try with Google Places API for better accuracy
+      const { latitude, longitude } = coords;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.GOOGLE_PLACES_API_KEY}`;
       
-      if (result.length > 0) {
-        const location = result[0];
-        const address = `${location.street || ''} ${location.city || ''} ${location.region || ''} ${location.postalCode || ''}`.trim();
-        return { address };
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        return { address: data.results[0].formatted_address };
+      }
+      
+      // Fall back to expo-location if Places API fails
+      console.log('Falling back to expo-location reverse geocoding');
+      const results = await Location.reverseGeocodeAsync(coords);
+      
+      if (!results || results.length === 0) {
+        return { 
+          error: { 
+            message: 'Could not find address for this location',
+            code: 'REVERSE_GEOCODE_ERROR'
+          } 
+        };
       }
 
-      return { error: { message: 'No address found for the given coordinates' } };
+      const address = results[0];
+      const addressString = [
+        address.name,
+        address.street,
+        address.city,
+        address.region,
+        address.postalCode,
+        address.country
+      ].filter(Boolean).join(', ');
+
+      return { address: addressString };
     } catch (error: any) {
+      console.error('Reverse geocoding error:', error);
       return {
         error: {
-          message: error.message || 'Failed to get address',
-          code: 'GEOCODING_ERROR'
+          message: error.message || 'Failed to reverse geocode location',
+          code: 'REVERSE_GEOCODE_ERROR'
         }
       };
     }
   }
 
-  // Forward geocoding - get coordinates from address
+  // Forward geocoding -  // Geocode an address to coordinates using Google Places API
   async geocode(address: string): Promise<{ location?: LocationCoords; error?: LocationError }> {
     try {
-      const result = await Location.geocodeAsync(address);
+      // First try with Google Places API for better accuracy
+      const { predictions, error: searchError } = await placesService.searchPlaces(address);
       
-      if (result.length > 0) {
-        const location = result[0];
+      if (searchError || !predictions || predictions.length === 0) {
+        // Fall back to expo-location if Places API fails
+        console.log('Falling back to expo-location geocoding');
+        const results = await Location.geocodeAsync(address);
+        
+        if (!results || results.length === 0) {
+          return { 
+            error: { 
+              message: 'Could not find location for this address',
+              code: 'GEOCODE_ERROR'
+            } 
+          };
+        }
+
         return {
           location: {
-            latitude: location.latitude,
-            longitude: location.longitude,
+            latitude: results[0].latitude,
+            longitude: results[0].longitude,
           }
         };
       }
 
-      return { error: { message: 'No coordinates found for the given address' } };
+      // Get the first prediction's details
+      const placeId = predictions[0].place_id;
+      const { details, error: detailsError } = await placesService.getPlaceDetails(placeId);
+      
+      if (detailsError || !details) {
+        throw new Error(detailsError || 'Failed to get place details');
+      }
+
+      return {
+        location: {
+          latitude: details.geometry.location.lat,
+          longitude: details.geometry.location.lng,
+        }
+      };
     } catch (error: any) {
+      console.error('Geocoding error:', error);
       return {
         error: {
-          message: error.message || 'Failed to get coordinates',
-          code: 'GEOCODING_ERROR'
+          message: error.message || 'Failed to geocode address',
+          code: 'GEOCODE_ERROR'
         }
       };
     }

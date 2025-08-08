@@ -9,27 +9,23 @@ export default function Index() {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        console.log('Checking authentication status...');
         const user = await authService.getCurrentUser();
-        console.log('Current user:', user);
         
-        if (user?.id) {
-          if (user.role) {
-            console.log('Redirecting to role dashboard:', user.role);
-          // User is authenticated, redirect to appropriate dashboard
-          router.replace(`/(${user.role})` as any);
-          } else {
-            console.log('User has no role, redirecting to role selection');
-            router.replace('/(auth)/role-selection');
-          }
-        } else {
-          console.log('No authenticated user, redirecting to role selection');
-          // User not authenticated, go to role selection
+        if (user?.id && user.role) {
+          // User is authenticated and has a role, redirect to their dashboard
+          const rolePath = `/${user.role}` as const;
+          router.replace(rolePath);
+        } else if (user?.id && !user.role) {
+          // User is authenticated but has no role, go to role selection
           router.replace('/(auth)/role-selection');
+        }
+        else {
+          // User is not authenticated, start the auth flow
+          router.replace('/(auth)/login');
         }
       } catch (error) {
         console.error('Auth check error:', error);
-        router.replace('/(auth)/role-selection');
+        router.replace('/(auth)/login');
       }
     };
 

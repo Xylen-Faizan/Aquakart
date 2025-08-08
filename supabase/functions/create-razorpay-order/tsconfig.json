@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es2021",
     "module": "esnext",
-    "lib": ["es2021", "deno.window"],
+    "lib": ["es2021", "dom", "dom.iterable", "esnext"],
     "types": ["@supabase/functions-js"],
     "moduleResolution": "node",
     "esModuleInterop": true,
