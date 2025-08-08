@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Product } from '@/app/(customer)'; // Import the Product type
+import { Product } from '@/types'; // --- FIX: Import Product from the new central types file ---
 import { Alert } from 'react-native';
+import { supabase } from '@/lib/supabase';
 import { razorpayClient } from '@/lib/razorpay-client';
 import { authService } from '@/lib/auth';
 
-// --- FIX: Explicitly define CartItem using the Product interface ---
 export interface CartItem extends Product {
   quantity: number;
 }
@@ -73,18 +73,44 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const user = await authService.getCurrentUser();
       if (!user) throw new Error("Please log in to check out.");
 
-      const result = await razorpayClient.checkout(cart, {
+      const razorpayResult = await razorpayClient.checkout(cart, {
         name: user.user_metadata?.full_name || 'AquaKart User',
         email: user.email || '',
         contact: user.phone || ''
       });
 
-      if (result.success) {
-        Alert.alert('Order Processing', result.message || 'Your order is being processed.');
+      if (razorpayResult.success && razorpayResult.orderId) {
+        Alert.alert('Payment Successful!', 'Placing your order...');
+        
+        const { data: newOrder, error: orderError } = await supabase
+          .from('orders')
+          .insert({
+            id: razorpayResult.orderId,
+            customer_id: user.id,
+            total: totalPrice,
+            status: 'payment_successful',
+          })
+          .select()
+          .single();
+
+        if (orderError) {
+          throw new Error(`Failed to save order to database: ${orderError.message}`);
+        }
+        
+        const productIds = cart.map(item => item.id);
+        const { data: assignmentData, error: assignmentError } = await supabase.functions.invoke('assign-order-to-vendor', {
+          body: { orderId: newOrder.id, productIds },
+        });
+
+        if (assignmentError) {
+          throw new Error(`Order assignment failed: ${assignmentError.message}`);
+        }
+
+        Alert.alert('Order Assigned!', `Your order has been assigned to ${assignmentData.assignedVendor.name}. You can track it in your orders.`);
         clearCart();
       } else {
-        if (result.message && !result.message.includes('cancelled')) {
-           Alert.alert('Payment Failed', result.message);
+        if (razorpayResult.message && !razorpayResult.message.includes('cancelled')) {
+           Alert.alert('Payment Failed', razorpayResult.message);
         }
       }
     } catch (error: any) {

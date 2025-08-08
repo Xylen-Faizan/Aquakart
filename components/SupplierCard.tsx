@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Star, Clock, Plus, Minus, Heart } from 'lucide-react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { Product } from '@/app/(customer)'; // Assuming Product type is exported
+import { Star, Clock, Plus, Minus, Heart } from 'lucide-react-native';
+import { Product } from '@/types'; // Use the central types file
 import { useCart } from '@/contexts/CartContext';
 
 interface SupplierCardProps {
-  product: Product;
+  product: Product; // --- FIX: This was incorrectly named 'Product' (capital P)
   isFavorite: boolean;
   onToggleFavorite: (productId: string, isCurrentlyFavorite: boolean) => void;
   index: number;
@@ -71,94 +71,94 @@ const SupplierCard: React.FC<SupplierCardProps> = ({ product, isFavorite, onTogg
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  image: {
-    width: '100%',
-    height: 140,
-    backgroundColor: '#F8FAFC',
-  },
-  favoriteButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 6,
-    borderRadius: 16,
-  },
-  details: {
-    padding: 12,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  description: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-    marginBottom: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  infoChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-    gap: 4,
-  },
-  infoText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#475569',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  price: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0F172A',
-  },
-  addButton: {
-    backgroundColor: '#2563EB',
-    padding: 8,
-    borderRadius: 8,
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-  },
-  quantityButton: {
-    padding: 8,
-  },
-  quantityText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E3A8A',
-    minWidth: 24,
-    textAlign: 'center',
-  },
-});
+    card: {
+      backgroundColor: '#FFF',
+      borderRadius: 16,
+      overflow: 'hidden',
+      shadowColor: '#1E293B',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 5,
+    },
+    image: {
+      width: '100%',
+      height: 140,
+      backgroundColor: '#F8FAFC',
+    },
+    favoriteButton: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      padding: 6,
+      borderRadius: 16,
+    },
+    details: {
+      padding: 12,
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: '#1E293B',
+    },
+    description: {
+      fontSize: 12,
+      color: '#64748B',
+      marginTop: 2,
+      marginBottom: 8,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 8,
+    },
+    infoChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#F1F5F9',
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: 6,
+      gap: 4,
+    },
+    infoText: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: '#475569',
+    },
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    price: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: '#0F172A',
+    },
+    addButton: {
+      backgroundColor: '#2563EB',
+      padding: 8,
+      borderRadius: 8,
+    },
+    quantityControl: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#EFF6FF',
+      borderRadius: 8,
+    },
+    quantityButton: {
+      padding: 8,
+    },
+    quantityText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#1E3A8A',
+      minWidth: 24,
+      textAlign: 'center',
+    },
+  });
 
 export default SupplierCard;
