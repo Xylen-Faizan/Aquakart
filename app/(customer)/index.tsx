@@ -1,36 +1,29 @@
-import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
   Modal,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  FlatList
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import MapView, { Marker } from 'react-native-maps'; // Import map components
-import { 
-  Search, 
-  MapPin, 
-  ShoppingCart, 
-  ChevronDown,
-  X // Import X for the close button
-} from 'lucide-react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
+import { Search, MapPin, Zap, ShoppingCart, ChevronDown, X } from 'lucide-react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { supabase } from '@/lib/supabase';
-import { locationService } from '@/lib/location';
-import { LocationCoords } from '@/lib/types/location'; // Import LocationCoords
-import { useCart } from '@/contexts/CartContext';
-import ProductCard from '@/components/ProductCard';
-import Cart from '@/components/Cart';
-import WaterScore from '@/components/WaterScore';
 import { authService } from '@/lib/auth';
+import { useCart } from '@/contexts/CartContext';
+import Cart from '@/components/Cart';
+import VendorCard, { Vendor } from '@/components/VendorCard';
+import { locationService } from '@/lib/location';
+import { LocationCoords } from '@/lib/types/location';
+import SupplierCard from '@/components/SupplierCard'; // We need this for the type
 
-// Define and export types
+// --- FIX: Ensure the Product interface is exported ---
 export interface Product {
   id: string;
   name: string;
@@ -41,57 +34,53 @@ export interface Product {
   size: string;
   rating: number;
   delivery_time: string;
-  inStock?: boolean;
 }
 
-const CustomerHomeScreen = () => {
+export default function CustomerHomeScreen() {
   const [isCartVisible, setIsCartVisible] = useState(false);
-  const [isMapVisible, setIsMapVisible] = useState(false); // State for map modal
-  const [currentLocation, setCurrentLocation] = useState<LocationCoords | null>(null); // State to hold coordinates
-  const [locationName, setLocationName] = useState('Getting location...');
+  const [isMapVisible, setIsMapVisible] = useState(false);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [locationName, setLocationName] = useState('Locating...');
+  const [currentLocation, setCurrentLocation] = useState<LocationCoords | null>(null);
   const { totalItems } = useCart();
-  const [waterScore, setWaterScore] = useState(0);
+  // We will manage products locally for now until a supplier screen is built
   const [products, setProducts] = useState<Product[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchAllData = async () => {
+  const fetchData = async () => {
     try {
-      // Fetch products first
-      const { data: productData, error: productError } = await supabase
-        .from('products')
-        .select('*');
+      const [vendorResponse, productResponse, locationData] = await Promise.all([
+        supabase.from('vendors').select('*'),
+        supabase.from('products').select('*'),
+        locationService.getCurrentLocation()
+      ]);
+
+      const { data: vendorData, error: vendorError } = vendorResponse;
+      if (vendorError) throw vendorError;
+      setVendors(vendorData || []);
+      
+      const { data: productData, error: productError } = productResponse;
       if (productError) throw productError;
       setProducts(productData || []);
-      
-      const currentUser = await authService.getCurrentUser();
-      if (currentUser) {
-        // Fetch favorites and customer data
-        const [favoritesResponse, customerResponse] = await Promise.all([
-          supabase.from('favorites').select('product_id').eq('user_id', currentUser.id),
-          supabase.from('customers').select('water_score').eq('id', currentUser.id).single()
-        ]);
-        
-        if (favoritesResponse.data) {
-          setFavorites(favoritesResponse.data.map(fav => fav.product_id));
-        }
-        if (customerResponse.data) {
-          setWaterScore(customerResponse.data.water_score || 0);
-        }
-      }
-      
-      // Get location
-      const { location } = await locationService.getCurrentLocation();
-      if (location) {
-        setCurrentLocation(location); // Save the coordinates
-        const { address } = await locationService.reverseGeocode(location);
+
+      if (locationData.location) {
+        setCurrentLocation(locationData.location);
+        const { address } = await locationService.reverseGeocode(locationData.location);
         setLocationName(address ? address.split(',')[0] : 'Current Location');
       } else {
         setLocationName('Location not found');
       }
+      
+      const user = await authService.getCurrentUser();
+      if (user) {
+        const { data: favData } = await supabase.from('favorites').select('product_id').eq('user_id', user.id);
+        if (favData) setFavorites(favData.map(fav => fav.product_id));
+      }
 
     } catch (error) {
-      console.error('Error fetching initial data:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +88,7 @@ const CustomerHomeScreen = () => {
 
   useEffect(() => {
     setIsLoading(true);
-    fetchAllData();
+    fetchData();
   }, []);
   
   const handleToggleFavorite = async (productId: string, isCurrentlyFavorite: boolean) => {
@@ -115,84 +104,81 @@ const CustomerHomeScreen = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-      </View>
-    );
-  }
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={['#4F46E5', '#7C3AED']} style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <TouchableOpacity 
-            style={styles.locationContainer} 
-            onPress={() => setIsMapVisible(true)} // This now correctly opens the map modal
-          >
-            <MapPin size={20} color="#FFF" />
-            <Text style={styles.locationText} numberOfLines={1}>{locationName}</Text>
-            <ChevronDown size={16} color="#FFF" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.cartIconContainer} 
-            onPress={() => setIsCartVisible(true)}
-          >
-            {totalItems > 0 && (
-              <View style={styles.cartBadge}><Text style={styles.cartBadgeText}>{totalItems}</Text></View>
-            )}
-            <ShoppingCart size={28} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.searchContainer}>
-          <Search size={20} color="#6B7280" />
-          <TextInput style={styles.searchInput} placeholder="Search water brands..."/>
-        </View>
-      </LinearGradient>
-
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchAllData} />}
-      >
-        <View style={styles.waterScoreContainer}><WaterScore score={waterScore} /></View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Products</Text>
-          <View style={styles.brandsGrid}>
-            {products.map((product) => (
-              <ProductCard 
-                key={product.id} 
-                product={product}
-                isFavorite={favorites.includes(product.id)}
-                onToggleFavorite={handleToggleFavorite}
-              />
-            ))}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.locationContainer} onPress={() => setIsMapVisible(true)}>
+          <MapPin size={20} color="#475569" />
+          <Text style={styles.locationText} numberOfLines={1}>{locationName}</Text>
+          <ChevronDown size={16} color="#64748B" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.cartIconContainer} onPress={() => setIsCartVisible(true)}>
+          {totalItems > 0 && (
+            <View style={styles.cartBadge}><Text style={styles.cartBadgeText}>{totalItems}</Text></View>
+          )}
+          <ShoppingCart size={28} color="#1E293B" />
+        </TouchableOpacity>
+      </View>
+      
+      <FlatList
+        ListHeaderComponent={
+          <>
+            <Animated.View entering={FadeInUp.duration(600)} style={styles.header}>
+              <Text style={styles.title}>
+                Find <Text style={styles.titleHighlight}>Water Suppliers</Text>
+              </Text>
+            </Animated.View>
+            <Animated.View entering={FadeInUp.delay(100).duration(500)} style={styles.searchSection}>
+              <View style={styles.searchContainer}>
+                <Search style={styles.searchIcon} color="#94A3B8" size={20} />
+                <TextInput
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChangeText={setSearchTerm}
+                  style={styles.searchInput}
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+            </Animated.View>
+            <View style={styles.mainContent}>
+              <Text style={styles.resultsTitle}>All Products</Text>
+            </View>
+          </>
+        }
+        data={filteredProducts}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
+        contentContainerStyle={styles.gridContainer}
+        renderItem={({ item, index }) => (
+          <View style={styles.cardContainer}>
+            <SupplierCard
+              product={item}
+              isFavorite={favorites.includes(item.id)}
+              onToggleFavorite={handleToggleFavorite}
+              index={index}
+            />
           </View>
-        </View>
-      </ScrollView>
+        )}
+        ListEmptyComponent={!isLoading ? <View style={styles.emptyContainer}><Text>No products found.</Text></View> : null}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchData} />}
+      />
 
-      {/* Cart Modal */}
       <Modal visible={isCartVisible} transparent={true} animationType="slide" onRequestClose={() => setIsCartVisible(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={() => setIsCartVisible(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
-             <Cart onClose={() => setIsCartVisible(false)} />
+            <Cart onClose={() => setIsCartVisible(false)} />
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
-      {/* Map Modal - RESTORED */}
-      <Modal
-        animationType="slide"
-        visible={isMapVisible}
-        onRequestClose={() => setIsMapVisible(false)}
-      >
+      <Modal visible={isMapVisible} animationType="slide" onRequestClose={() => setIsMapVisible(false)}>
         <View style={styles.mapContainer}>
-          <TouchableOpacity style={styles.mapCloseButton} onPress={() => setIsMapVisible(false)}>
-            <X size={24} color="#333" />
-          </TouchableOpacity>
+          <TouchableOpacity style={styles.mapCloseButton} onPress={() => setIsMapVisible(false)}><X size={24} color="#333" /></TouchableOpacity>
           {currentLocation ? (
             <MapView
               style={styles.map}
@@ -202,67 +188,79 @@ const CustomerHomeScreen = () => {
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}
-              showsUserLocation={true}
-              showsMyLocationButton={true}
+              showsUserLocation
+              showsMyLocationButton
             >
-              <Marker
-                coordinate={currentLocation}
-                title="Your Location"
-                description="You are here"
-              />
+              <Marker coordinate={currentLocation} title="Your Location" />
             </MapView>
           ) : (
-            <View style={styles.mapLoadingContainer}>
-              <ActivityIndicator size="large" />
-              <Text>Fetching your location...</Text>
-            </View>
+            <View style={styles.mapLoadingContainer}><ActivityIndicator size="large" color="#2563EB" /></View>
           )}
         </View>
       </Modal>
     </SafeAreaView>
   );
 }
-
+// Add all the styles from the previous turn here...
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  locationContainer: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 16 },
-  locationText: { fontSize: 14, color: '#FFF', fontWeight: '500', maxWidth: '85%' },
-  cartIconContainer: { padding: 4 },
-  cartBadge: { position: 'absolute', right: -4, top: -4, backgroundColor: '#EF4444', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#4F46E5' },
-  cartBadgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, gap: 12, },
-  searchInput: { flex: 1, fontSize: 16, color: '#1E293B', padding: 0, },
-  scrollView: { flex: 1 },
-  waterScoreContainer: { paddingHorizontal: 20, paddingTop: 16 },
-  section: { padding: 20 },
-  sectionTitle: { fontSize: 20, fontWeight: '700', color: '#1E293B', marginBottom: 16 },
-  brandsGrid: { gap: 16 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end', },
-  modalContent: { backgroundColor: '#F8FAFC', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '85%', paddingTop: 8, },
-  
-  // Styles for Map Modal
-  mapContainer: {
-    flex: 1,
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  mapCloseButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    padding: 8,
-    borderRadius: 20,
-  },
-  mapLoadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
-
-export default CustomerHomeScreen;
+    container: { flex: 1, backgroundColor: '#F8FAFC' },
+    topHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    locationContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      flex: 1,
+    },
+    locationText: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: '#1E293B',
+    },
+    cartIconContainer: {
+      padding: 4,
+    },
+    cartBadge: {
+      position: 'absolute',
+      right: -4,
+      top: -4,
+      backgroundColor: '#EF4444',
+      borderRadius: 10,
+      width: 20,
+      height: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#F8FAFC',
+      zIndex: 1,
+    },
+    cartBadgeText: {
+      color: '#FFF',
+      fontSize: 10,
+      fontWeight: 'bold',
+    },
+    header: { padding: 16, paddingTop: 8, alignItems: 'center' },
+    title: { fontSize: 32, fontWeight: 'bold', color: '#1E293B' },
+    titleHighlight: { color: '#2563EB' },
+    searchSection: { paddingHorizontal: 16, marginVertical: 8 },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 12, shadowColor: '#1E293B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3, },
+    searchIcon: { position: 'absolute', left: 16, zIndex: 1 },
+    searchInput: { flex: 1, padding: 16, paddingLeft: 48, fontSize: 16 },
+    mainContent: { paddingHorizontal: 16, marginTop: 16 },
+    resultsTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 },
+    gridContainer: { paddingHorizontal: 8 },
+    row: { flex: 1, justifyContent: "space-around" },
+    cardContainer: { width: '50%', padding: 8 },
+    emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 50, },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end', },
+    modalContent: { backgroundColor: '#F8FAFC', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '85%', paddingTop: 8, },
+    mapContainer: { flex: 1, },
+    map: { ...StyleSheet.absoluteFillObject, },
+    mapCloseButton: { position: 'absolute', top: 50, left: 20, zIndex: 1, backgroundColor: 'rgba(255, 255, 255, 0.8)', padding: 8, borderRadius: 20, },
+    mapLoadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  });

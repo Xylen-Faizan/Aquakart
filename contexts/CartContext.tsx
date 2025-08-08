@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Product } from '@/app/(customer)'; // Make sure Product type is exported from your index
+import { Product } from '@/app/(customer)'; // Import the Product type
 import { Alert } from 'react-native';
 import { razorpayClient } from '@/lib/razorpay-client';
 import { authService } from '@/lib/auth';
 
+// --- FIX: Explicitly define CartItem using the Product interface ---
 export interface CartItem extends Product {
   quantity: number;
 }
@@ -82,7 +83,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         Alert.alert('Order Processing', result.message || 'Your order is being processed.');
         clearCart();
       } else {
-        // Don't show an alert if payment was just cancelled by the user
         if (result.message && !result.message.includes('cancelled')) {
            Alert.alert('Payment Failed', result.message);
         }
