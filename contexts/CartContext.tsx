@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Product } from '@/types'; // --- FIX: Import Product from the new central types file ---
+import { Product } from '@/types';
 import { Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { razorpayClient } from '@/lib/razorpay-client';
@@ -109,11 +109,13 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         Alert.alert('Order Assigned!', `Your order has been assigned to ${assignmentData.assignedVendor.name}. You can track it in your orders.`);
         clearCart();
       } else {
+        // This provides a more specific error if the payment is cancelled vs. failed
         if (razorpayResult.message && !razorpayResult.message.includes('cancelled')) {
            Alert.alert('Payment Failed', razorpayResult.message);
         }
       }
     } catch (error: any) {
+      // This will now show the SPECIFIC error message from the Edge Function
       Alert.alert('Checkout Error', error.message || 'An unexpected error occurred.');
     } finally {
       setIsProcessing(false);
