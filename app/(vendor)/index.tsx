@@ -17,11 +17,61 @@ import {
   Truck,
   CheckCircle,
   XCircle,
-  ArrowRight
+  ArrowRight,
+  BarChart2,
+  CheckCircle2,
+  Clock4,
+  TrendingUp as TrendingUpIcon
 } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '@/src/design-system';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+
+// Sample data for the chart
+const weeklyData = [
+  { day: 'Mon', orders: 18 },
+  { day: 'Tue', orders: 22 },
+  { day: 'Wed', orders: 25 },
+  { day: 'Thu', orders: 21 },
+  { day: 'Fri', orders: 28 },
+  { day: 'Sat', orders: 32 },
+  { day: 'Sun', orders: 24 },
+];
+
+const performanceMetrics = [
+  { 
+    label: 'Order Completion Rate', 
+    value: '96%', 
+    color: colors.success,
+    icon: CheckCircle2,
+    trend: 'up',
+    change: '2% from last week'
+  },
+  { 
+    label: 'On-Time Delivery', 
+    value: '98%', 
+    color: colors.primary,
+    icon: Clock4,
+    trend: 'up',
+    change: '1% from last week'
+  },
+  { 
+    label: 'Customer Rating', 
+    value: '4.7/5', 
+    color: colors.warning,
+    icon: Star,
+    trend: 'up',
+    change: '0.1 from last month'
+  },
+  { 
+    label: 'Order Growth', 
+    value: '+12%', 
+    color: colors.success,
+    icon: TrendingUpIcon,
+    trend: 'up',
+    change: 'vs. last week'
+  },
+];
 
 export default function VendorDashboard() {
   const [isOnline, setIsOnline] = useState(true);
@@ -146,6 +196,61 @@ export default function VendorDashboard() {
             </View>
           </View>
         </LinearGradient>
+
+        {/* Performance Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Performance Metrics</Text>
+          <View style={styles.metricsGrid}>
+            {performanceMetrics.map((metric, index) => (
+              <Card key={index} variant="default" style={styles.metricCard}>
+                <View style={styles.metricHeader}>
+                  <View style={[styles.metricIcon, { backgroundColor: metric.color + '20' }]}>
+                    <metric.icon size={18} color={metric.color} />
+                  </View>
+                  <Text style={[styles.metricChange, { color: metric.trend === 'up' ? colors.success : colors.error }]}>
+                    {metric.change}
+                  </Text>
+                </View>
+                <Text style={[styles.metricValue, { color: metric.color }]}>{metric.value}</Text>
+                <Text style={styles.metricLabel}>{metric.label}</Text>
+              </Card>
+            ))}
+          </View>
+        </View>
+
+        {/* Weekly Orders Chart */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Weekly Orders</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>View Details</Text>
+            </TouchableOpacity>
+          </View>
+          <Card variant="default" style={styles.chartCard}>
+            <View style={styles.chartHeader}>
+              <Text style={styles.chartTitle}>Order Volume</Text>
+              <Text style={styles.chartSubtitle}>Last 7 days</Text>
+            </View>
+            <View style={styles.chartContainer}>
+              {weeklyData.map((data, index) => (
+                <View key={index} style={styles.chartBarContainer}>
+                  <View 
+                    style={[
+                      styles.chartBar, 
+                      { 
+                        height: (data.orders / 40) * 100, 
+                        backgroundColor: colors.primary,
+                        opacity: 0.8
+                      }
+                    ]} 
+                  />
+                  <Text style={styles.chartBarLabel}>{data.day}</Text>
+                  <Text style={styles.chartBarValue}>{data.orders}</Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+        </View>
 
         {/* Quick Stats */}
         <View style={styles.statsContainer}>
@@ -306,6 +411,86 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: spacing['lg'],
+  },
+  metricCard: {
+    width: '48%',
+    marginBottom: spacing['lg'],
+    padding: spacing['lg'],
+  },
+  metricHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing['sm'],
+  },
+  metricIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  metricValue: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: 'bold',
+    marginBottom: spacing['xs'],
+  },
+  metricLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+  },
+  metricChange: {
+    fontSize: typography.fontSize.xs,
+  },
+  chartCard: {
+    marginTop: spacing['lg'],
+    padding: spacing['xl'],
+  },
+  chartHeader: {
+    marginBottom: spacing['xl'],
+  },
+  chartTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  chartSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  chartContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 200,
+    paddingTop: spacing['xl'],
+  },
+  chartBarContainer: {
+    alignItems: 'center',
+    width: '12%',
+  },
+  chartBar: {
+    width: '70%',
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    marginBottom: spacing['xs'],
+  },
+  chartBarLabel: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  chartBarValue: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: '500',
+    color: colors.textPrimary,
   },
   content: {
     flex: 1,

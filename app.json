@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "",
-    "slug": "",
+    "name": "aquakart",
+    "slug": "aquakart",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -42,7 +42,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "1c7a4xxx-xxxx-xxxx-xxxx-xxxxxxxxxxx"
+        "projectId": "5856f5b7-6498-48eb-a228-dcafadc2b94c"
       }
     }
   }

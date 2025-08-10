@@ -19,6 +19,8 @@ interface CartContextType {
   isProcessing: boolean;
   totalItems: number;
   totalPrice: number;
+  checkoutStep: 'cart' | 'address' | 'payment';
+  setCheckoutStep: (step: 'cart' | 'address' | 'payment') => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -26,6 +28,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<'cart' | 'address' | 'payment'>('cart');
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -123,7 +126,19 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, updateQuantity, removeFromCart, clearCart, checkout, isProcessing, totalItems, totalPrice }}>
+    <CartContext.Provider value={{ 
+      cart, 
+      addToCart, 
+      updateQuantity, 
+      removeFromCart, 
+      clearCart, 
+      checkout, 
+      isProcessing, 
+      totalItems, 
+      totalPrice,
+      checkoutStep,
+      setCheckoutStep
+    }}>
       {children}
     </CartContext.Provider>
   );

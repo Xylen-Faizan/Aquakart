@@ -1,103 +1,82 @@
 import React, { useState } from 'react';
-import { View, TextInput, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '@/src/design-system';
+import { TextInput, View, Text, StyleSheet, TextInputProps } from 'react-native';
+import { colors, commonStyles } from '@/src/design-system'; // Import from the new design system
 
-interface InputProps {
+interface InputProps extends TextInputProps {
   label?: string;
-  placeholder?: string;
-  value: string;
-  onChangeText: (text: string) => void;
   error?: string;
-  disabled?: boolean;
-  secureTextEntry?: boolean;
-  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
-  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  multiline?: boolean;
-  numberOfLines?: number;
-  style?: ViewStyle;
-  inputStyle?: TextStyle;
+  icon?: React.ReactNode;
 }
 
-export default function Input({
-  label,
-  placeholder,
-  value,
-  onChangeText,
-  error,
-  disabled = false,
-  secureTextEntry = false,
-  keyboardType = 'default',
-  autoCapitalize = 'none',
-  multiline = false,
-  numberOfLines = 1,
-  style,
-  inputStyle,
-}: InputProps) {
+const Input: React.FC<InputProps> = ({ label, error, icon, style, ...props }) => {
   const [isFocused, setIsFocused] = useState(false);
 
-  const getContainerStyle = (): ViewStyle => {
-    return {
-      ...styles.container,
-      ...style,
-    };
-  };
-
-  const getInputStyle = (): TextStyle => {
-    const baseStyle = {
-      ...commonStyles.input,
-      ...(isFocused && commonStyles.inputFocused),
-      opacity: disabled ? 0.6 : 1,
-      minHeight: multiline ? numberOfLines * 24 : undefined,
-    };
-
-    return { ...baseStyle, ...inputStyle };
-  };
-
   return (
-    <View style={getContainerStyle()}>
-      {label && (
-        <Text style={styles.label}>{label}</Text>
-      )}
-      
-      <TextInput
-        style={getInputStyle()}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textTertiary}
-        value={value}
-        onChangeText={onChangeText}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        editable={!disabled}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        multiline={multiline}
-        numberOfLines={numberOfLines}
-        textAlignVertical={multiline ? 'top' : 'center'}
-      />
-      
-      {error && (
-        <Text style={styles.errorText}>{error}</Text>
-      )}
+    <View style={styles.container}>
+      {label && <Text style={styles.label}>{label}</Text>}
+      <View
+        style={[
+          styles.inputContainer,
+          isFocused && styles.inputContainerFocused, // Use focused style from commonStyles
+          error ? styles.inputContainerError : null, // Add error style
+          icon ? styles.withIcon : null
+        ]}
+      >
+        {icon && <View style={styles.iconContainer}>{icon}</View>}
+        <TextInput
+          style={[styles.input, style]} // Apply base input style
+          placeholderTextColor={colors.textTertiary}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          {...props}
+        />
+      </View>
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.md,
+    width: '100%',
+    marginBottom: 16,
   },
   label: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-    fontFamily: typography.fontFamily.medium,
+    ...commonStyles.text.bodySmall, // Use text style from commonStyles
+    marginBottom: 8,
+  },
+  inputContainer: {
+    ...commonStyles.input, // Apply base input container styles
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputContainerFocused: {
+    ...commonStyles.inputFocused, // Apply focused styles
+  },
+  inputContainerError: {
+    borderColor: colors.error, // Use error color from design system
+  },
+  withIcon: {
+    paddingLeft: 40, // Adjust padding if there is an icon
+  },
+  input: {
+    flex: 1,
+    height: '100%',
+    // The text color and font size are already in commonStyles.input,
+    // so we don't need to repeat them here.
+  },
+  iconContainer: {
+    position: 'absolute',
+    left: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100%',
   },
   errorText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.error,
-    marginTop: spacing.xs,
-    fontFamily: typography.fontFamily.regular,
+    ...commonStyles.text.caption, // Use text style from commonStyles
+    color: colors.error, // Use error color
+    marginTop: 4,
   },
-}); 
+});
+
+export default Input;

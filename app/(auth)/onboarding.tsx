@@ -1,23 +1,42 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  FlatList,
+  TouchableOpacity,
+  StatusBar,
+  ListRenderItemInfo,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Droplets, Zap, Shield, Truck, ArrowRight, ArrowLeft } from 'lucide-react-native';
+import { Droplets, Zap, Shield, Truck, ArrowRight } from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  interpolate,
+  interpolateColor,
+  Extrapolate,
+  SharedValue,
+} from 'react-native-reanimated';
 import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '@/src/design-system';
 import Button from '@/components/ui/Button';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-interface OnboardingSlide {
+// --- DATA ---
+interface OnboardingSlideData {
   id: number;
   title: string;
   description: string;
   icon: React.ComponentType<any>;
-  gradient: string[];
+  gradient: readonly [string, string];
 }
 
-const onboardingSlides: OnboardingSlide[] = [
+const onboardingSlides: OnboardingSlideData[] = [
   {
     id: 1,
     title: 'Pure Water, Pure Life',
@@ -48,16 +67,121 @@ const onboardingSlides: OnboardingSlide[] = [
   },
 ];
 
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<OnboardingSlideData>);
+
+// --- SLIDE COMPONENT ---
+interface SlideProps {
+  item: OnboardingSlideData;
+  index: number;
+  scrollX: SharedValue<number>;
+}
+
+const Slide: React.FC<SlideProps> = ({ item, index, scrollX }) => {
+  const IconComponent = item.icon;
+
+  const iconAnimatedStyle = useAnimatedStyle(() => {
+    const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+    const iconScale = interpolate(scrollX.value, inputRange, [0.5, 1, 0.5], Extrapolate.CLAMP);
+    const iconOpacity = interpolate(scrollX.value, inputRange, [0, 1, 0], Extrapolate.CLAMP);
+    return {
+      opacity: iconOpacity,
+      transform: [{ scale: iconScale }],
+    };
+  });
+
+  const titleAnimatedStyle = useAnimatedStyle(() => {
+    const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+    const titleTranslateY = interpolate(
+      scrollX.value,
+      inputRange,
+      [50, 0, -50],
+      Extrapolate.CLAMP
+    );
+    return {
+      transform: [{ translateY: titleTranslateY }],
+    };
+  });
+
+  const descriptionAnimatedStyle = useAnimatedStyle(() => {
+    const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+    const descriptionTranslateY = interpolate(
+      scrollX.value,
+      inputRange,
+      [100, 0, -100],
+      Extrapolate.CLAMP
+    );
+    return {
+      transform: [{ translateY: descriptionTranslateY }],
+    };
+  });
+
+  return (
+    <View style={styles.slide}>
+      {/* FIX: Assert the gradient array as `readonly` to match expected type */}
+      <LinearGradient colors={item.gradient} style={styles.gradientBackground}>
+        <Animated.View style={[styles.iconContainer, iconAnimatedStyle]}>
+          <IconComponent size={120} color={colors.white} />
+        </Animated.View>
+      </LinearGradient>
+      <View style={styles.contentContainer}>
+        <Animated.View style={titleAnimatedStyle}>
+          <Text style={styles.title}>{item.title}</Text>
+        </Animated.View>
+        <Animated.View style={descriptionAnimatedStyle}>
+          <Text style={styles.description}>{item.description}</Text>
+        </Animated.View>
+      </View>
+    </View>
+  );
+};
+
+// --- PAGINATION COMPONENT ---
+interface PaginationProps {
+  data: OnboardingSlideData[];
+  scrollX: SharedValue<number>;
+}
+
+const Pagination: React.FC<PaginationProps> = ({ data, scrollX }) => {
+  return (
+    <View style={styles.paginationContainer}>
+      {data.map((_, i) => {
+        const animatedStyle = useAnimatedStyle(() => {
+          const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+          const dotWidth = interpolate(scrollX.value, inputRange, [8, 24, 8], Extrapolate.CLAMP);
+          const dotColor = interpolateColor(
+            scrollX.value,
+            inputRange,
+            [colors.gray300, colors.primary, colors.gray300]
+          );
+          return {
+            width: dotWidth,
+            backgroundColor: dotColor,
+          };
+        });
+        return <Animated.View key={`dot-${i}`} style={[styles.paginationDot, animatedStyle]} />;
+      })}
+    </View>
+  );
+};
+
+// --- MAIN ONBOARDING COMPONENT ---
 export default function Onboarding() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<OnboardingSlideData>>(null);
   const router = useRouter();
+  const scrollX = useSharedValue(0);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
+
+  const getCurrentIndex = () => Math.round(scrollX.value / width);
 
   const handleNext = () => {
+    const currentIndex = getCurrentIndex();
     if (currentIndex < onboardingSlides.length - 1) {
-      const nextIndex = currentIndex + 1;
-      setCurrentIndex(nextIndex);
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
     } else {
       router.push('/(auth)/role-selection');
     }
@@ -67,100 +191,41 @@ export default function Onboarding() {
     router.push('/(auth)/role-selection');
   };
 
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      const prevIndex = currentIndex - 1;
-      setCurrentIndex(prevIndex);
-      flatListRef.current?.scrollToIndex({ index: prevIndex, animated: true });
-    }
-  };
-
-  const renderSlide = ({ item }: { item: OnboardingSlide }) => {
-    const IconComponent = item.icon;
-    
-    return (
-      <View style={styles.slide}>
-        <LinearGradient
-          colors={item.gradient}
-          style={styles.gradientBackground}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.iconContainer}>
-            <IconComponent size={120} color={colors.white} />
-          </View>
-        </LinearGradient>
-        
-        <View style={styles.contentContainer}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.description}>{item.description}</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderPagination = () => {
-    return (
-      <View style={styles.paginationContainer}>
-        {onboardingSlides.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.paginationDot,
-              index === currentIndex && styles.paginationDotActive,
-            ]}
-          />
-        ))}
-      </View>
-    );
-  };
+  const renderItem = ({ item, index }: ListRenderItemInfo<OnboardingSlideData>) => (
+    <Slide item={item} index={index} scrollX={scrollX} />
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
-      
-      {/* Header */}
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <View style={styles.header}>
         <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Slides */}
-      <FlatList
+      <AnimatedFlatList
         ref={flatListRef}
         data={onboardingSlides}
-        renderItem={renderSlide}
+        renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(event) => {
-          const index = Math.round(event.nativeEvent.contentOffset.x / width);
-          setCurrentIndex(index);
-        }}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         style={styles.flatList}
       />
 
-      {/* Pagination */}
-      {renderPagination()}
+      <Pagination data={onboardingSlides} scrollX={scrollX} />
 
-      {/* Navigation */}
       <View style={styles.navigationContainer}>
-        {currentIndex > 0 && (
-          <TouchableOpacity onPress={handlePrevious} style={styles.navButton}>
-            <ArrowLeft size={24} color={colors.primary} />
-          </TouchableOpacity>
-        )}
-        
-        <View style={styles.navSpacer} />
-        
         <Button
-          title={currentIndex === onboardingSlides.length - 1 ? "Get Started" : "Next"}
+          title="Next"
           onPress={handleNext}
           variant="primary"
           size="large"
-          icon={currentIndex === onboardingSlides.length - 1 ? undefined : <ArrowRight size={20} color={colors.white} />}
+          icon={<ArrowRight size={20} color={colors.white} />}
           style={styles.nextButton}
         />
       </View>
@@ -168,36 +233,38 @@ export default function Onboarding() {
   );
 }
 
+// --- STYLES ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    top: 50,
+    right: 0,
+    zIndex: 10,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
   },
   skipButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    padding: spacing.sm,
   },
   skipText: {
+    fontFamily: typography.fontFamily.semibold,
     fontSize: typography.fontSize.base,
     color: colors.textSecondary,
-    fontWeight: typography.fontWeight.medium,
-    fontFamily: typography.fontFamily.medium,
   },
   flatList: {
-    flex: 1,
+    flexGrow: 0,
+    height: '75%', 
   },
   slide: {
     width,
-    height: height * 0.7,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   gradientBackground: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -211,69 +278,44 @@ const styles = StyleSheet.create({
     ...shadows.lg,
   },
   contentContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    width: '100%',
+    height: '40%',
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius['3xl'],
     borderTopRightRadius: borderRadius['3xl'],
     padding: spacing.xl,
+    justifyContent: 'center',
     ...shadows.xl,
+    shadowColor: colors.shadowDark,
   },
   title: {
-    fontSize: typography.fontSize['3xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimary,
+    ...commonStyles.text.h3,
     textAlign: 'center',
     marginBottom: spacing.md,
-    fontFamily: typography.fontFamily.bold,
   },
   description: {
-    fontSize: typography.fontSize.lg,
+    ...commonStyles.text.body,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: typography.lineHeight.relaxed * typography.fontSize.lg,
-    fontFamily: typography.fontFamily.regular,
+    lineHeight: typography.lineHeight.relaxed * typography.fontSize.base,
   },
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.lg,
+    marginVertical: spacing.lg,
     gap: spacing.sm,
   },
   paginationDot: {
-    width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.gray300,
-  },
-  paginationDotActive: {
-    width: 24,
-    backgroundColor: colors.primary,
   },
   navigationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  navButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.md,
-  },
-  navSpacer: {
-    flex: 1,
   },
   nextButton: {
-    flex: 1,
-    maxWidth: 200,
+    width: '100%',
   },
-}); 
+});

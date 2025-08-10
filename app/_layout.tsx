@@ -5,47 +5,29 @@ import { authService } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { CartProvider } from '@/contexts/CartContext';
 
-// This component will handle the initial auth state and routing
 function AuthLayout() {
   const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
   const segments = useSegments();
   const router = useRouter();
 
-  // Function to update user and profile state
-  const updateAuthState = async () => {
-    try {
-      const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
-      setProfile(currentUser);
-      return currentUser;
-    } catch (error) {
-      console.error('Error updating auth state:', error);
-      setUser(null);
-      setProfile(null);
-      return null;
-    } finally {
-      if (!initialized) setInitialized(true);
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    // Check current user on initial load
-    const initializeAuth = async () => {
-      await updateAuthState();
-      setInitialized(true);
+    const checkUser = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Error getting user:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    initializeAuth();
+    checkUser();
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event) => {
-        console.log('Auth state changed:', event);
-        await updateAuthState();
+      (_event, session) => {
+        setUser(session?.user ?? null);
       }
     );
 
@@ -55,42 +37,20 @@ function AuthLayout() {
   }, []);
 
   useEffect(() => {
-    // Don't run the effect until we've completed the initial auth check
-    if (!initialized) return;
+    if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    const inTabsGroup = segments[0] === '(customer)' || segments[0] === '(vendor)' || segments[0] === '(admin)';
 
-    console.log('Auth state changed - User:', user ? 'Logged in' : 'Not logged in', 'Current route:', segments[0]);
-
-    // If the user is not signed in and the current segment is not in the auth group
-    if (!user) {
-      if (!inAuthGroup) {
-        console.log('Redirecting to login');
-        router.replace('/(auth)/login');
-      }
-      return;
+    if (!user && !inAuthGroup) {
+      router.replace('/(auth)/login');
+    } else if (user && inAuthGroup) {
+      // Ensure we only use valid route groups
+      const role = (user.role === 'admin' || user.role === 'vendor') ? user.role : 'customer';
+      router.replace(`/${role === 'admin' ? '(admin)' : role === 'vendor' ? '(vendor)' : '(customer)'}`);
     }
+  }, [user, loading, segments, router]);
 
-    // If the user is signed in and the current segment is in the auth group
-    if (inAuthGroup) {
-      console.log('User is logged in, redirecting based on role:', user.role);
-      // Redirect to the appropriate screen based on user role
-      if (user.role === 'customer') {
-        router.replace('/(customer)');
-      } else if (user.role === 'vendor') {
-        router.replace('/(vendor)');
-      } else if (user.role === 'admin') {
-        router.replace('/(admin)');
-      } else {
-        // If user has no role, redirect to role selection
-        router.replace('/(auth)/role-selection');
-      }
-    }
-  }, [user, initialized, segments]);
-
-  // Show loading indicator while checking auth state
-  if (loading || !initialized) {
+  if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#4F46E5" />
@@ -101,15 +61,13 @@ function AuthLayout() {
 
   return (
     <CartProvider>
-      <View style={{ flex: 1 }}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(customer)" options={{ headerShown: false }} />
-          <Stack.Screen name="(vendor)" options={{ headerShown: false }} />
-          <Stack.Screen name="(admin)" options={{ headerShown: false }} />
-        </Stack>
-      </View>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(customer)" options={{ headerShown: false }} />
+        <Stack.Screen name="(vendor)" options={{ headerShown: false }} />
+        <Stack.Screen name="(admin)" options={{ headerShown: false }} />
+      </Stack>
     </CartProvider>
   );
 }
