@@ -1,114 +1,65 @@
-import { Tabs, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { Home, ShoppingCart, Heart, User } from 'lucide-react-native';
-import { authService } from '@/lib/auth';
+import React from 'react';
+import { Tabs } from 'expo-router';
+import { Home, Heart, ShoppingCart, User } from 'lucide-react-native';
+import { useCart } from '@/contexts/CartContext';
+import { colors } from '@/src/design-system';
 
-// This is the main layout for the customer section
 export default function CustomerLayout() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-
-  useEffect(() => {
-    // Check current user on initial load
-    const checkUser = async () => {
-      try {
-        const currentUser = await authService.getCurrentUser();
-        setUser(currentUser);
-      } catch (error) {
-        console.error('Error getting user:', error);
-        // Redirect to login if there's an error getting the user
-        router.replace('/(auth)/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkUser();
-  }, []);
-
-  // Show loading indicator while checking auth state
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-      </View>
-    );
-  }
-
-  // If no user is logged in, don't render anything (will be redirected by the auth flow)
-  if (!user) {
-    return null;
-  }
-
-  // Define the tab bar items
-  const tabBarItems = [
-    {
-      name: 'index',
-      title: 'Home',
-      icon: Home,
-    },
-    {
-      name: 'orders',
-      title: 'Orders',
-      icon: ShoppingCart,
-    },
-    {
-      name: 'favorites',
-      title: 'Favorites',
-      icon: Heart,
-    },
-    {
-      name: 'account',
-      title: 'Account',
-      icon: User,
-    },
-  ];
+  const { totalItems } = useCart();
 
   return (
     <Tabs
       screenOptions={{
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarShowLabel: false,
         headerShown: false,
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
-          paddingTop: 8,
+          backgroundColor: colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
           height: 60,
-          paddingBottom: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          marginBottom: 4,
+          paddingBottom: 5,
         },
       }}
+      backBehavior="history"
     >
-      {/* Only render the tabs we want to show */}
-      {tabBarItems.map((item) => (
-        <Tabs.Screen
-          key={item.name}
-          name={item.name}
-          options={{
-            title: item.title,
-            tabBarIcon: ({ color }) => {
-              const Icon = item.icon;
-              return <Icon size={24} color={color} />;
-            },
-          }}
-        />
-      ))}
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color }) => <Home color={color} size={28} />,
+          href: '/(customer)/',
+        }}
+      />
+
+      <Tabs.Screen
+        name="favorites"
+        options={{
+          title: 'Favorites',
+          tabBarIcon: ({ color }) => <Heart color={color} size={28} />,
+          href: '/(customer)/favorites',
+        }}
+      />
       
-      {/* Hide all other screens from tab bar */}
-      {['addresses', 'edit-profile', 'payment-methods', 'rate-us', 'refer-earn', 'subscription-plans', 'success', 'support'].map((name) => (
-        <Tabs.Screen 
-          key={name}
-          name={name as any} 
-          options={{ 
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: 'none' },
-          }} 
-        />
-      ))}
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: 'Orders',
+          tabBarIcon: ({ color }) => <ShoppingCart color={color} size={28} />,
+          tabBarBadge: totalItems > 0 ? totalItems : undefined,
+          href: '/(customer)/orders',
+        }}
+      />
+
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: 'Account',
+          tabBarIcon: ({ color }) => <User color={color} size={28} />,
+          href: '/(customer)/account',
+        }}
+      />
     </Tabs>
   );
 }

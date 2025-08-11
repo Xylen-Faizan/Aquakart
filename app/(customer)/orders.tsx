@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { authService } from '@/lib/auth';
 import { useIsFocused } from '@react-navigation/native';
+import { Link } from 'expo-router';
+import { colors, typography, commonStyles, borderRadius } from '@/src/design-system';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -81,6 +83,24 @@ export default function OrdersScreen() {
         </Text>
         {/* You would list order items here */}
         <Text style={styles.orderTotal}>Total: ₹{item.total}</Text>
+        
+        {item.status === 'delivered' && item.vendors?.name && (
+          <Link
+            href={{
+              pathname: "/(customer)/add-review",
+              params: { 
+                order_id: item.id, 
+                vendor_id: item.vendor_id,
+                vendor_name: item.vendors.name 
+              }
+            }}
+            asChild
+          >
+            <TouchableOpacity style={styles.reviewButton}>
+              <Text style={styles.reviewButtonText}>Leave a Review</Text>
+            </TouchableOpacity>
+          </Link>
+        )}
       </View>
     </View>
   );
@@ -172,5 +192,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 50,
     alignItems: 'center',
+  },
+  reviewButton: {
+    marginTop: 12,
+    backgroundColor: colors.primaryLight,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  reviewButtonText: {
+    ...commonStyles.text.bodySmall,
+    color: colors.primaryDark,
+    fontWeight: '600',
   }
 });

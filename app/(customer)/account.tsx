@@ -1,286 +1,413 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, Alert, ActivityIndicator, ScrollView } from 'react-native';
-import { supabase } from '@/lib/supabase';
-import { authService } from '@/lib/auth';
-import * as ImagePicker from 'expo-image-picker';
-import { decode } from 'base64-arraybuffer';
+import React, { useState, useEffect } from 'react';
 import {
-  Camera,
-  LogOut,
-  User as UserIcon,
-  ChevronRight,
-  MapPin,
-  CreditCard,
-  Star,
-  Shield,
-  HelpCircle
-} from 'lucide-react-native';
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Modal,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+  FlatList,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import {
+  User,
+  LogOut,
+  ChevronRight,
+  MapPin,
+  Heart,
+  CreditCard,
+  Star,
+  MessageSquare,
+  ShoppingBag, // Using a different icon for My Orders
+} from 'lucide-react-native';
+import { authService } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { commonStyles, colors, spacing, typography, borderRadius } from '@/src/design-system';
+import StarRating from '@/components/ui/StarRating';
+import Button from '@/components/ui/Button';
 
-// Helper component for menu items
-const MenuItem = ({ label, icon, onPress, isDestructive = false }: any) => (
-  <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-    <View style={styles.menuItemIcon}>{icon}</View>
-    <Text style={[styles.menuText, isDestructive && styles.destructiveText]}>{label}</Text>
-    {!isDestructive && <ChevronRight size={20} color="#94A3B8" />}
-  </TouchableOpacity>
-);
+// Define the Profile type based on the customers table
+interface Profile {
+  id: string;
+  full_name?: string;
+  email?: string;
+  phone_number?: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
+// Define the User type for auth
+interface User {
+  id: string;
+  email?: string;
+}
+
+// --- SELF-CONTAINED COMPONENT FOR PENDING REVIEWS ---
+interface PendingReview {
+  order_id: string;
+  vendor_id: string;
+  vendor_name: string;
+  order_date: string;
+}
+
+const PendingReviewsSection: React.FC<{ profile: Profile }> = ({ profile }) => {
+  const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+  const [isReviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<PendingReview | null>(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      setLoadingReviews(true);
+      const { data, error } = await supabase.rpc('get_pending_reviews', {
+        p_customer_id: profile.id,
+      });
+
+      if (error) {
+        console.error('Error fetching pending reviews:', error);
+      } else {
+        setPendingReviews(data || []);
+      }
+      setLoadingReviews(false);
+    };
+
+    fetchReviews();
+  }, [profile.id]);
+
+  const handleOpenReviewModal = (review: PendingReview) => {
+    setSelectedReview(review);
+    setRating(0);
+    setComment('');
+    setReviewModalVisible(true);
+  };
+
+  const handleSubmitReview = async () => {
+    if (rating === 0) {
+      Alert.alert('Rating Required', 'Please select a star rating.');
+      return;
+    }
+    if (!profile || !selectedReview) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('reviews').insert({
+        user_id: profile.id,
+        order_id: selectedReview.order_id,
+        vendor_id: selectedReview.vendor_id,
+        rating,
+        comment: comment.trim(),
+      });
+
+      if (error) throw error;
+
+      setPendingReviews(reviews => reviews.filter(r => r.order_id !== selectedReview.order_id));
+      setReviewModalVisible(false);
+      Alert.alert('Success', 'Thank you for your feedback!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Could not submit your review.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Pending Reviews</Text>
+        {loadingReviews ? (
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
+        ) : pendingReviews.length > 0 ? (
+          <FlatList
+            data={pendingReviews}
+            keyExtractor={(item) => item.order_id}
+            renderItem={({ item }) => (
+              <View style={styles.reviewItem}>
+                <View style={styles.reviewItemDetails}>
+                  <Text style={styles.reviewVendorName}>{item.vendor_name}</Text>
+                  <Text style={styles.reviewDate}>
+                    Ordered on {new Date(item.order_date).toLocaleDateString()}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.rateButton}
+                  onPress={() => handleOpenReviewModal(item)}
+                >
+                  <Star size={18} color={colors.primary} />
+                  <Text style={styles.rateButtonText}>Rate</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            scrollEnabled={false}
+          />
+        ) : (
+          <Text style={styles.noReviewsText}>You have no pending reviews. Great job!</Text>
+        )}
+      </View>
+
+      <Modal
+        visible={isReviewModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReviewModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Rate Your Order</Text>
+            <Text style={styles.modalVendorName}>
+              How was your experience with {selectedReview?.vendor_name}?
+            </Text>
+            <View style={styles.starContainer}>
+              <StarRating rating={rating} onStarPress={setRating} starSize={40} />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Add a comment (optional)"
+              multiline
+              value={comment}
+              onChangeText={setComment}
+              placeholderTextColor={colors.textTertiary}
+            />
+            <Button
+              title={isSubmitting ? 'Submitting...' : 'Submit Review'}
+              onPress={handleSubmitReview}
+              disabled={isSubmitting}
+              variant="primary"
+            />
+            <TouchableOpacity onPress={() => setReviewModalVisible(false)}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+};
+
+// --- MAIN ACCOUNT SCREEN COMPONENT ---
 export default function AccountScreen() {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [signingOut, setSigningOut] = useState(false); // Add new state for sign-out process
-  const [user, setUser] = useState<any>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const router = useRouter();
 
-  // This effect hook will handle the sign-out logic.
-  // It runs only when the `signingOut` state changes to true.
   useEffect(() => {
-    if (signingOut) {
-      const performSignOut = async () => {
-        const { error } = await authService.signOut();
-        if (error) {
-          Alert.alert("Sign Out Error", error.message);
-          setSigningOut(false); // Reset on failure
-        } else {
-          // This ensures navigation happens after the state update
-          router.replace('/(auth)/login');
+    const fetchUser = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          // Fetch profile data from customers table
+          const { data } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+          setProfile(data);
         }
-      };
-      performSignOut();
-    }
-  }, [signingOut]);
-
-  // Fetch user profile on component mount
-  useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true);
-      const currentUser = await authService.getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
-        const { data } = await supabase
-          .from('customers')
-          .select('full_name, avatar_url')
-          .eq('id', currentUser.id)
-          .single();
-
-        if (data?.avatar_url) {
-          downloadImage(data.avatar_url);
-        }
+      } catch (error) {
+        console.error('Error fetching user:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    fetchProfile();
+
+    fetchUser();
   }, []);
 
-  const downloadImage = async (path: string) => {
+  const signOut = async () => {
     try {
-      const { data, error } = await supabase.storage.from('avatars').download(path);
-      if (error) throw error;
-      const fr = new FileReader();
-      fr.readAsDataURL(data);
-      fr.onload = () => setAvatarUrl(fr.result as string);
+      await authService.signOut();
+      router.replace('/(auth)/login');
     } catch (error) {
-      console.error('Error downloading image:', error);
+      console.error('Error signing out:', error);
     }
   };
 
-  const uploadAvatar = async () => {
-    // ... (uploadAvatar function remains unchanged)
-    try {
-      setUploading(true);
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5,
-      });
-
-      if (result.canceled || !result.assets || result.assets.length === 0) return;
-      
-      const image = result.assets[0];
-      const base64 = await fetch(image.uri).then(response => response.blob()).then(blob => {
-          return new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.readAsDataURL(blob);
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.onerror = error => reject(error);
-          });
-      });
-
-      if (typeof base64 !== 'string') throw new Error("Failed to convert image to base64");
-
-      const fileExt = image.uri.split('.').pop()?.toLowerCase() ?? 'jpeg';
-      const contentType = `image/${fileExt}`;
-      const filePath = `${user.id}/${new Date().getTime()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, decode(base64.split(',')[1]), { contentType, upsert: true });
-
-      if (uploadError) throw new Error(`Direct upload failed: ${uploadError.message}`);
-
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update({ avatar_url: filePath })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
-      
-      setAvatarUrl(image.uri);
-    } catch (error) {
-      if (error instanceof Error) Alert.alert('Upload Failed', error.message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Show a loading screen while loading data or signing out
-  if (loading || signingOut) {
-    return <ActivityIndicator style={styles.loadingIndicator} size="large" />;
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
+
+  const menuItems = [
+    { title: 'My Orders', icon: ShoppingBag, screen: '/(customer)/orders' },
+    { title: 'Saved Addresses', icon: MapPin, screen: '/(customer)/addresses' },
+    { title: 'Favorites', icon: Heart, screen: '/(customer)/favorites' },
+    { title: 'Payment Methods', icon: CreditCard, screen: '/(customer)/payment-methods' },
+    { title: 'Support', icon: MessageSquare, screen: '/(customer)/support' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        <View style={styles.profileContainer}>
-          <View>
-              <Image
-                  source={avatarUrl ? { uri: avatarUrl } : require('@/assets/images/default-avatar.png')}
-                  style={styles.avatar}
-              />
-              <TouchableOpacity style={styles.cameraButton} onPress={uploadAvatar} disabled={uploading}>
-                  {uploading ? <ActivityIndicator size="small" color="#FFF" /> : <Camera size={18} color="#FFF" />}
-              </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.profileHeader}
+          onPress={() => router.push('/(customer)/edit-profile')}
+        >
+          <Image
+            source={
+              profile?.avatar_url
+                ? { uri: profile.avatar_url }
+                : require('@/assets/images/default-avatar.png')
+            }
+            style={styles.avatar}
+          />
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{profile?.full_name || 'AquaKart User'}</Text>
+            <Text style={styles.profileEmail}>{user?.email}</Text>
           </View>
-          <Text style={styles.userName}>{user?.user_metadata?.full_name || 'AquaKart User'}</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
+          <ChevronRight color={colors.textTertiary} size={24} />
+        </TouchableOpacity>
+
+        {profile && <PendingReviewsSection profile={profile} />}
+
+        <View style={styles.section}>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.menuItem}
+              onPress={() => router.push(item.screen as any)}
+            >
+              <item.icon color={colors.primary} size={24} />
+              <Text style={styles.menuItemText}>{item.title}</Text>
+              <ChevronRight color={colors.textTertiary} size={20} />
+            </TouchableOpacity>
+          ))}
         </View>
 
-        <View style={styles.menuSection}>
-          <MenuItem 
-            label="Edit Profile"
-            icon={<UserIcon size={20} color="#475569" />}
-            onPress={() => router.push('/(customer)/edit-profile')}
-          />
-          <MenuItem 
-            label="My Addresses"
-            icon={<MapPin size={20} color="#475569" />}
-            onPress={() => router.push('/(customer)/addresses')}
-          />
-          <MenuItem 
-            label="Payment Methods"
-            icon={<CreditCard size={20} color="#475569" />}
-            onPress={() => router.push('/(customer)/payment-methods')}
-          />
-        </View>
-        
-        <View style={styles.menuSection}>
-          <MenuItem 
-            label="Rate Us"
-            icon={<Star size={20} color="#475569" />}
-            onPress={() => router.push('/(customer)/rate-us')}
-          />
-           <MenuItem 
-            label="Support & Help"
-            icon={<HelpCircle size={20} color="#475569" />}
-            onPress={() => router.push('/(customer)/support')}
-          />
-          <MenuItem 
-            label="Privacy Policy"
-            icon={<Shield size={20} color="#475569" />}
-            onPress={() => { /* Open privacy policy URL */ }}
-          />
-        </View>
-        
-        <View style={styles.menuSection}>
-          <MenuItem 
-            label="Sign Out"
-            icon={<LogOut size={20} color="#EF4444" />}
-            onPress={() => setSigningOut(true)} // This now only triggers the effect
-            isDestructive={true}
-          />
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+            <LogOut color={colors.error} size={24} />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-
+// Styles
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  loadingIndicator: {
-    flex: 1,
-    justifyContent: 'center',
+  container: { ...commonStyles.container, backgroundColor: colors.surfaceSecondary },
+  profileHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  profileContainer: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    backgroundColor: '#FFF',
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.borderLight, // Added a background color for the placeholder
   },
-  cameraButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#4F46E5',
-    padding: 8,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#FFF'
+  profileInfo: {
+    flex: 1,
+    marginLeft: spacing.lg,
   },
-  userName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginTop: 16,
+  profileName: {
+    ...commonStyles.text.h4,
+    fontWeight: typography.fontWeight.bold,
   },
-  userEmail: {
-    fontSize: 16,
-    color: '#64748B',
-    marginTop: 4,
+  profileEmail: {
+    ...commonStyles.text.body,
+    color: colors.textSecondary,
   },
-  menuSection: {
-    marginTop: 12,
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    overflow: 'hidden',
+  section: {
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.sm,
+  },
+  sectionTitle: {
+    ...commonStyles.text.h4,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    marginBottom: spacing.md,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.lg,
   },
-  menuItemIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+  menuItemText: { ...commonStyles.text.body, flex: 1 },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.lg,
+  },
+  signOutText: { ...commonStyles.text.body, color: colors.error, fontWeight: 'bold' },
+  reviewItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  reviewItemDetails: { flex: 1 },
+  reviewVendorName: { ...commonStyles.text.body, fontWeight: typography.fontWeight.medium },
+  reviewDate: { ...commonStyles.text.caption, color: colors.textSecondary },
+  rateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primaryLight,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+  },
+  rateButtonText: { color: colors.primary, fontWeight: typography.fontWeight.semibold },
+  noReviewsText: {
+    ...commonStyles.text.body,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.lg,
   },
-  menuText: {
-    flex: 1,
-    marginLeft: 16,
-    fontSize: 16,
-    color: '#334155',
+  modalContent: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    alignItems: 'center',
   },
-  destructiveText: {
-      color: '#EF4444',
-      fontWeight: '600'
-  }
+  modalTitle: { ...commonStyles.text.h3, marginBottom: spacing.sm },
+  modalVendorName: { ...commonStyles.text.body, color: colors.textSecondary, marginBottom: spacing.lg, textAlign: 'center' },
+  starContainer: { marginVertical: spacing.lg },
+  input: {
+    ...commonStyles.input,
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: spacing.md,
+    width: '100%',
+    marginBottom: spacing.lg,
+  },
+  cancelText: {
+    ...commonStyles.text.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    padding: spacing.sm,
+  },
 });
