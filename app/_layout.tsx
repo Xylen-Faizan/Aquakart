@@ -5,7 +5,9 @@ import { authService } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { CartProvider } from '@/contexts/CartContext';
 
-function AuthLayout() {
+// This is the main navigation component.
+// It determines whether to show authentication screens or the main app screens.
+function RootLayoutNav() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const segments = useSegments();
@@ -41,12 +43,15 @@ function AuthLayout() {
 
     const inAuthGroup = segments[0] === '(auth)';
 
+    // If the user is not signed in and not in the auth group, redirect to login.
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
-      // Ensure we only use valid route groups
+      // If the user is signed in and in the auth group, redirect to their dashboard.
       const role = (user.role === 'admin' || user.role === 'vendor') ? user.role : 'customer';
-      router.replace(`/${role === 'admin' ? '(admin)' : role === 'vendor' ? '(vendor)' : '(customer)'}`);
+      // Redirect to the appropriate tab group
+      const redirectPath = `/(tabs)/(${role})`;
+      router.replace(redirectPath as any);
     }
   }, [user, loading, segments, router]);
 
@@ -59,19 +64,21 @@ function AuthLayout() {
     );
   }
 
+  // This Stack navigator defines the main navigation groups of the app.
+  // We use a Stack navigator to separate auth from the main app
   return (
-    <CartProvider>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(customer)" options={{ headerShown: false }} />
-        <Stack.Screen name="(vendor)" options={{ headerShown: false }} />
-        <Stack.Screen name="(admin)" options={{ headerShown: false }} />
-      </Stack>
-    </CartProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
   );
 }
 
+// The root layout component wraps the navigation with necessary providers.
 export default function RootLayout() {
-  return <AuthLayout />;
+  return (
+    <CartProvider>
+      <RootLayoutNav />
+    </CartProvider>
+  );
 }
