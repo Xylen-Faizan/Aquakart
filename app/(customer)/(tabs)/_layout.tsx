@@ -1,17 +1,14 @@
 import { Tabs } from 'expo-router';
 import { Home, Heart, ShoppingCart, User } from 'lucide-react-native';
-import { useCart } from '@/contexts/CartContext';
 import { colors } from '@/src/design-system';
 
 export default function TabsLayout() {
-  const { totalItems } = useCart();
-
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.surface,
@@ -19,40 +16,45 @@ export default function TabsLayout() {
           borderTopColor: colors.border,
           height: 60,
           paddingBottom: 5,
+          paddingTop: 5,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          marginTop: 2,
+          marginBottom: 2,
         },
       }}
-      backBehavior="history"
     >
       <Tabs.Screen
-        name="(customer)/index"
+        name="home"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Home color={color} size={28} />,
+          tabBarIcon: ({ color }) => <Home color={color} size={24} />,
+          headerShown: false,
         }}
       />
 
       <Tabs.Screen
-        name="(customer)/favorites"
+        name="favorites"
         options={{
           title: 'Favorites',
-          tabBarIcon: ({ color }) => <Heart color={color} size={28} />,
+          tabBarIcon: ({ color }) => <Heart color={color} size={24} />,
         }}
       />
       
       <Tabs.Screen
-        name="(customer)/orders"
+        name="orders"
         options={{
           title: 'Orders',
-          tabBarIcon: ({ color }) => <ShoppingCart color={color} size={28} />,
-          tabBarBadge: totalItems > 0 ? totalItems : undefined,
+          tabBarIcon: ({ color }) => <ShoppingCart color={color} size={24} />,
         }}
       />
 
       <Tabs.Screen
-        name="(customer)/account"
+        name="account"
         options={{
           title: 'Account',
-          tabBarIcon: ({ color }) => <User color={color} size={28} />,
+          tabBarIcon: ({ color }) => <User color={color} size={24} />,
         }}
       />
     </Tabs>

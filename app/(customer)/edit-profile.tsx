@@ -1,43 +1,90 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { User, Phone, Mail, Camera, Save, ArrowLeft } from 'lucide-react-native';
-import { authService } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+
+type Profile = {
+  full_name: string;
+  email: string;
+  phone: string;
+  avatar_url: string;
+};
+
+type UserMetadata = {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+  avatar_url?: string;
+};
+
+type DatabaseProfile = {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+  avatar_url?: string;
+};
 
 export default function EditProfile() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState({
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [profile, setProfile] = useState<Profile>({
     full_name: '',
     email: '',
     phone: '',
     avatar_url: '',
   });
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
-      const user = await authService.getCurrentUser();
-      if (user && user.profile) {
-        setProfile({
-          full_name: user.profile.full_name || '',
-          email: user.profile.email || '',
-          phone: user.profile.phone || '',
-          avatar_url: user.profile.avatar_url || '',
-        });
+      setLoading(true);
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error || !user) {
+        console.error('No authenticated user found:', error?.message || 'No user data');
+        return;
       }
+      
+      // Get user metadata from profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Error fetching profile:', profileError);
+        throw profileError;
+      }
+
+      // Get user metadata from auth
+      const userMetadata = user.user_metadata as UserMetadata | undefined;
+
+      setProfile({
+        full_name: profileData?.full_name || userMetadata?.full_name || '',
+        email: user.email || userMetadata?.email || '',
+        phone: profileData?.phone || userMetadata?.phone || '',
+        avatar_url: profileData?.avatar_url || userMetadata?.avatar_url || '',
+      });
     } catch (error) {
       console.error('Error loading profile:', error);
       Alert.alert('Error', 'Failed to load profile data');
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const handleInputChange = (field: keyof Profile, value: string) => {
+    setProfile(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const handleSave = async () => {
@@ -58,22 +105,36 @@ export default function EditProfile() {
 
     setSaving(true);
     try {
-      const user = await authService.getCurrentUser();
-      if (!user) {
+      // Get the current user from Supabase auth
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
         Alert.alert('Error', 'User not authenticated');
         return;
       }
 
+      // Update the user's email in auth if it has changed
+      if (user.email !== profile.email) {
+        const { error: updateEmailError } = await supabase.auth.updateUser({
+          email: profile.email,
+        });
+
+        if (updateEmailError) {
+          throw updateEmailError;
+        }
+      }
+
+      // Update the user's profile in the database
       const { error } = await supabase
-        .from('customers')
-        .update({
+        .from('profiles')
+        .upsert({
+          id: user.id,
           full_name: profile.full_name,
           email: profile.email,
           phone: profile.phone,
           avatar_url: profile.avatar_url,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+        });
 
       if (error) {
         throw error;

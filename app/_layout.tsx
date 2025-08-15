@@ -1,84 +1,68 @@
+import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, View, Text } from 'react-native';
-import { authService } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'; // Import AuthProvider and useAuth
 import { CartProvider } from '@/contexts/CartContext';
+import { ActivityIndicator, View } from 'react-native';
+import { colors } from '@/src/design-system';
 
-// This is the main navigation component.
-// It determines whether to show authentication screens or the main app screens.
+// This component handles the navigation logic
 function RootLayoutNav() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const currentUser = await authService.getCurrentUser();
-        setUser(currentUser);
-      } catch (error) {
-        console.error('Error getting user:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (loading) return;
+    // Wait until the auth state is loaded
+    if (loading) {
+      return;
+    }
 
     const inAuthGroup = segments[0] === '(auth)';
 
-    // If the user is not signed in and not in the auth group, redirect to login.
+    // If the user is not signed in and not in the auth group, redirect to login
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
-      // If the user is signed in and in the auth group, redirect to their dashboard.
+    } 
+    // If the user is signed in and in the auth group, redirect to the main app
+    else if (user && inAuthGroup) {
       const role = (user.role === 'admin' || user.role === 'vendor') ? user.role : 'customer';
-      // Redirect to the appropriate tab group
-      const redirectPath = `/(tabs)/(${role})`;
+      const redirectPath = `/${role === 'admin' ? '(admin)' : role === 'vendor' ? '(vendor)' : '(customer)'}`;
       router.replace(redirectPath as any);
     }
   }, [user, loading, segments, router]);
 
+  // Show a loading indicator while we check for a user
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={{ marginTop: 10, color: '#6B7280' }}>Loading...</Text>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  // This Stack navigator defines the main navigation groups of the app.
-  // We use a Stack navigator to separate auth from the main app
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
+      <Stack.Screen 
+        name="(customer)" 
+        options={{
+          // This ensures the tab bar is shown for customer routes
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen name="(vendor)" />
+      <Stack.Screen name="(admin)" />
     </Stack>
   );
 }
 
-// The root layout component wraps the navigation with necessary providers.
+// The main export that wraps our entire app in the necessary Providers
 export default function RootLayout() {
   return (
-    <CartProvider>
-      <RootLayoutNav />
-    </CartProvider>
+    <AuthProvider>
+      <CartProvider>
+        <RootLayoutNav />
+      </CartProvider>
+    </AuthProvider>
   );
 }
