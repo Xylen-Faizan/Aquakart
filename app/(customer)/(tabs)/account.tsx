@@ -14,8 +14,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import {
-  User,
   LogOut,
   ChevronRight,
   MapPin,
@@ -24,12 +25,15 @@ import {
   Star,
   MessageSquare,
   ShoppingBag,
+  Camera,
 } from 'lucide-react-native';
 import { authService } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { colors, spacing, typography, borderRadius, commonStyles } from '@/src/design-system';
+import { commonStyles, colors, spacing, typography, borderRadius } from '@/src/design-system';
+import StarRating from '@/components/ui/StarRating';
+import Button from '@/components/ui/Button';
 
-// Define the Profile type based on the customers table
+// ---------------- TYPES ----------------
 interface Profile {
   id: string;
   full_name?: string;
@@ -40,13 +44,11 @@ interface Profile {
   updated_at?: string;
 }
 
-// Define the User type for auth
-interface AuthUser {
+interface User {
   id: string;
   email?: string;
 }
 
-// --- SELF-CONTAINED COMPONENT FOR PENDING REVIEWS ---
 interface PendingReview {
   order_id: string;
   vendor_id: string;
@@ -54,379 +56,354 @@ interface PendingReview {
   order_date: string;
 }
 
-const PendingReviewsSection = ({ profile }: { profile: Profile | null }) => {
+// ---------------- PENDING REVIEWS ----------------
+const PendingReviewsSection: React.FC<{ profile: Profile }> = ({ profile }) => {
   const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+  const [isReviewModalVisible, setReviewModalVisible] = useState(false);
   const [selectedReview, setSelectedReview] = useState<PendingReview | null>(null);
-  const [rating, setRating] = useState(5);
-  const [reviewText, setReviewText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (profile?.id) {
-      fetchPendingReviews();
-    }
-  }, [profile?.id]);
+    const fetchReviews = async () => {
+      setLoadingReviews(true);
+      const { data, error } = await supabase.rpc('get_pending_reviews', {
+        p_vendor_id: profile.id,
+      });
 
-  const fetchPendingReviews = async () => {
-    try {
-      setLoading(true);
-      // This is a mock implementation. In a real app, you would fetch this from your API.
-      const mockReviews: PendingReview[] = [
-        {
-          order_id: 'ORD12345',
-          vendor_id: 'V001',
-          vendor_name: 'Fresh Grocery Store',
-          order_date: '2023-05-15',
-        },
-        {
-          order_id: 'ORD12346',
-          vendor_id: 'V002',
-          vendor_name: 'Organic Market',
-          order_date: '2023-05-10',
-        },
-      ];
-      setPendingReviews(mockReviews);
-    } catch (error) {
-      console.error('Error fetching pending reviews:', error);
-      Alert.alert('Error', 'Failed to load pending reviews');
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (error) {
+        console.error('Error fetching pending reviews:', error);
+      } else {
+        setPendingReviews(data || []);
+      }
+      setLoadingReviews(false);
+    };
 
-  const handleReviewPress = (review: PendingReview) => {
+    fetchReviews();
+  }, [profile.id]);
+
+  const handleOpenReviewModal = (review: PendingReview) => {
     setSelectedReview(review);
-    setModalVisible(true);
+    setRating(0);
+    setComment('');
+    setReviewModalVisible(true);
   };
 
   const handleSubmitReview = async () => {
-    if (!selectedReview || !reviewText.trim()) return;
-    
-    setSubmitting(true);
+    if (rating === 0) {
+      Alert.alert('Rating Required', 'Please select a star rating.');
+      return;
+    }
+    if (!profile || !selectedReview) return;
+
+    setIsSubmitting(true);
     try {
-      // Simulate API call to submit review
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setPendingReviews(prev => 
-        prev.filter(r => r.order_id !== selectedReview.order_id)
-      );
-      
-      Alert.alert('Success', 'Thank you for your review!');
-      setModalVisible(false);
-      setReviewText('');
-      setRating(5);
-    } catch (error) {
-      console.error('Error submitting review:', error);
-      Alert.alert('Error', 'Failed to submit review');
+      const { error } = await supabase.from('reviews').insert({
+        user_id: profile.id,
+        order_id: selectedReview.order_id,
+        vendor_id: selectedReview.vendor_id,
+        rating,
+        comment: comment.trim(),
+      });
+
+      if (error) throw error;
+
+      setPendingReviews(reviews => reviews.filter(r => r.order_id !== selectedReview.order_id));
+      setReviewModalVisible(false);
+      Alert.alert('Success', 'Thank you for your feedback!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Could not submit your review.');
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (pendingReviews.length === 0) {
-    return null; // Don't show the section if there are no pending reviews
-  }
-
   return (
-    <View style={styles.sectionContainer}>
-      <Text style={styles.sectionTitle}>Pending Reviews</Text>
-      <View style={styles.reviewsContainer}>
-        {pendingReviews.map((review) => (
-          <TouchableOpacity
-            key={review.order_id}
-            style={styles.reviewItem}
-            onPress={() => handleReviewPress(review)}
-          >
-            <View style={styles.reviewContent}>
-              <Text style={styles.reviewVendor}>{review.vendor_name}</Text>
-              <Text style={styles.reviewDate}>
-                Order #{review.order_id} • {review.order_date}
-              </Text>
-            </View>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        ))}
+    <>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          Pending Reviews ({pendingReviews.length})
+        </Text>
+        {loadingReviews ? (
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
+        ) : pendingReviews.length > 0 ? (
+          <FlatList
+            data={pendingReviews}
+            keyExtractor={(item) => item.order_id}
+            renderItem={({ item }) => (
+              <View style={styles.reviewItem}>
+                <View style={styles.reviewItemDetails}>
+                  <Text style={styles.reviewVendorName}>{item.vendor_name}</Text>
+                  <Text style={styles.reviewDate}>
+                    Ordered on {new Date(item.order_date).toLocaleDateString()}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.rateButton}
+                  onPress={() => handleOpenReviewModal(item)}
+                >
+                  <Star size={18} color={colors.primary} />
+                  <Text style={styles.rateButtonText}>Rate</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            scrollEnabled={false}
+          />
+        ) : (
+          <Text style={styles.noReviewsText}>You have no pending reviews. Great job!</Text>
+        )}
       </View>
 
       <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
+        visible={isReviewModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReviewModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Rate your order</Text>
-            <Text style={styles.modalSubtitle}>
+            <Text style={styles.modalTitle}>Rate Your Order</Text>
+            <Text style={styles.modalVendorName}>
               How was your experience with {selectedReview?.vendor_name}?
             </Text>
-            
-            <View style={styles.ratingContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setRating(star)}
-                  style={styles.starButton}
-                >
-                  <Star
-                    size={32}
-                    color={star <= rating ? colors.warning : colors.border}
-                    fill={star <= rating ? colors.warning : 'transparent'}
-                  />
-                </TouchableOpacity>
-              ))}
+            <View style={styles.starContainer}>
+              <StarRating rating={rating} onStarPress={setRating} starSize={40} />
             </View>
-            
             <TextInput
-              style={styles.reviewInput}
-              placeholder="Share details about your experience..."
-              placeholderTextColor={colors.textSecondary}
+              style={styles.input}
+              placeholder="Add a comment (optional)"
               multiline
-              numberOfLines={4}
-              value={reviewText}
-              onChangeText={setReviewText}
+              value={comment}
+              onChangeText={setComment}
+              placeholderTextColor={colors.textTertiary}
             />
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-                disabled={submitting}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.submitButton, submitting && styles.disabledButton]}
-                onPress={handleSubmitReview}
-                disabled={!reviewText.trim() || submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Submit Review</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <Button
+              title={isSubmitting ? 'Submitting...' : 'Submit Review'}
+              onPress={handleSubmitReview}
+              disabled={isSubmitting}
+              variant="primary"
+            />
+            <TouchableOpacity onPress={() => setReviewModalVisible(false)}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </View>
+    </>
   );
 };
 
-// --- MAIN ACCOUNT SCREEN COMPONENT ---
+// ---------------- MAIN ACCOUNT SCREEN ----------------
 export default function AccountScreen() {
-  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [signingOut, setSigningOut] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    fetchProfile();
+    const fetchUser = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          const { data } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+          setProfile(data);
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
   }, []);
 
-  const fetchProfile = async () => {
+  const handlePickAvatar = async () => {
+    if (!profile) return;
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please grant photo library permission.');
+      return;
+    }
+
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
       
-      if (user) {
-        // This is a mock implementation
-        const mockProfile: Profile = {
-          id: user.id,
-          full_name: user.user_metadata?.full_name || 'John Doe',
-          email: user.email || 'john.doe@example.com',
-          phone_number: '+1234567890',
-          avatar_url: user.user_metadata?.avatar_url || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=200',
-          created_at: '2023-01-01',
-          updated_at: '2023-05-01',
-        };
-        setProfile(mockProfile);
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      Alert.alert('Error', 'Failed to load profile');
+      // Pick image
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 4],
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      
+      // Fetch the file as blob
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(`profiles/${profile.id}.jpg`, blob, {
+          upsert: true,
+          contentType: 'image/jpeg',
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(`profiles/${profile.id}.jpg`);
+
+      const newAvatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('customers')
+        .update({ avatar_url: newAvatarUrl })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      setProfile(prev => prev ? { ...prev, avatar_url: newAvatarUrl } : prev);
+      Alert.alert('Success', 'Profile picture updated!');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      Alert.alert('Upload error', error.message || 'Failed to update profile picture.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSignOut = async () => {
+  const signOut = async () => {
     try {
-      setSigningOut(true);
       await authService.signOut();
       router.replace('/(auth)/login');
     } catch (error) {
       console.error('Error signing out:', error);
-      Alert.alert('Error', 'Failed to sign out');
-    } finally {
-      setSigningOut(false);
     }
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
+  const menuItems = [
+    { title: 'My Orders', icon: ShoppingBag, screen: '/(customer)/orders' },
+    { title: 'Saved Addresses', icon: MapPin, screen: '/(customer)/addresses' },
+    { title: 'Favorites', icon: Heart, screen: '/(customer)/favorites' },
+    { title: 'Payment Methods', icon: CreditCard, screen: '/(customer)/payment-methods' },
+    { title: 'Support', icon: MessageSquare, screen: '/(customer)/support' },
+  ];
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView>
         <View style={styles.profileHeader}>
-          <Image
-            source={{ uri: profile?.avatar_url }}
-            style={styles.avatar}
-            resizeMode="cover"
-          />
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>
-              {profile?.full_name || 'Guest User'}
-            </Text>
-            <Text style={styles.profileEmail}>
-              {profile?.email || 'guest@example.com'}
-            </Text>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => router.push('/(customer)/edit-profile')}
+          <View style={styles.avatarContainer}>
+            <Image
+              source={
+                profile?.avatar_url
+                  ? { uri: profile.avatar_url }
+                  : require('@/assets/images/default-avatar.png')
+              }
+              style={styles.avatar}
+            />
+            <TouchableOpacity 
+              style={styles.cameraButton} 
+              onPress={handlePickAvatar}
+              disabled={loading}
             >
-              <Text style={styles.editButtonText}>Edit Profile</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Camera size={18} color="#fff" />
+              )}
             </TouchableOpacity>
           </View>
+          <TouchableOpacity
+            style={styles.profileInfo}
+            onPress={() => router.push('/(customer)/edit-profile')}
+          >
+            <Text style={styles.profileName}>{profile?.full_name || 'AquaKart User'}</Text>
+            <Text style={styles.profileEmail}>{user?.email}</Text>
+          </TouchableOpacity>
+          <ChevronRight color={colors.textTertiary} size={24} />
         </View>
 
         {profile && <PendingReviewsSection profile={profile} />}
 
-        <View style={styles.menuContainer}>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push('/(customer)/addresses')}
-          >
-            <View style={styles.menuIcon}>
-              <MapPin size={20} color={colors.primary} />
-            </View>
-            <Text style={styles.menuText}>My Addresses</Text>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push('/(customer)/favorites')}
-          >
-            <View style={styles.menuIcon}>
-              <Heart size={20} color={colors.primary} />
-            </View>
-            <Text style={styles.menuText}>My Favorites</Text>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push('/(customer)/orders')}
-          >
-            <View style={styles.menuIcon}>
-              <ShoppingBag size={20} color={colors.primary} />
-            </View>
-            <Text style={styles.menuText}>My Orders</Text>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push('/(customer)/payment-methods')}
-          >
-            <View style={styles.menuIcon}>
-              <CreditCard size={20} color={colors.primary} />
-            </View>
-            <Text style={styles.menuText}>Payment Methods</Text>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push('/(customer)/rate-us')}
-          >
-            <View style={styles.menuIcon}>
-              <Star size={20} color={colors.primary} />
-            </View>
-            <Text style={styles.menuText}>Rate Us</Text>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push('/(customer)/support')}
-          >
-            <View style={styles.menuIcon}>
-              <MessageSquare size={20} color={colors.primary} />
-            </View>
-            <Text style={styles.menuText}>Help & Support</Text>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
+        <View style={styles.section}>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.menuItem}
+              onPress={() => router.push(item.screen as any)}
+            >
+              <item.icon color={colors.primary} size={24} />
+              <Text style={styles.menuItemText}>{item.title}</Text>
+              <ChevronRight color={colors.textTertiary} size={20} />
+            </TouchableOpacity>
+          ))}
         </View>
 
-        <TouchableOpacity
-          style={styles.signOutButton}
-          onPress={handleSignOut}
-          disabled={signingOut}
-        >
-          {signingOut ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <LogOut size={20} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>App Version 1.0.0</Text>
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+            <LogOut color={colors.error} size={24} />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// Styles
+// ---------------- STYLES ----------------
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1,
-    backgroundColor: colors.surfaceSecondary 
-  },
+  container: { ...commonStyles.container, backgroundColor: colors.surfaceSecondary },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.lg,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    margin: spacing.md,
-    marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  avatarContainer: {
+    position: 'relative',
+    width: 64,
+    height: 64,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.borderLight,
+  },
+  cameraButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 4,
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: colors.surface,
   },
   profileInfo: {
     flex: 1,
@@ -434,200 +411,101 @@ const styles = StyleSheet.create({
   },
   profileName: {
     ...commonStyles.text.h4,
-    color: colors.textPrimary,
-    marginBottom: 2,
+    fontWeight: typography.fontWeight.bold,
   },
   profileEmail: {
     ...commonStyles.text.body,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
   },
-  editButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.primaryLight,
-    borderRadius: borderRadius.md,
-  },
-  editButtonText: {
-    ...commonStyles.text.body,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary,
-  },
-  menuContainer: {
+  section: {
+    marginTop: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    margin: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  sectionTitle: {
+    ...commonStyles.text.h4,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
     marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.lg,
   },
-  menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  menuText: {
-    ...commonStyles.text.body,
-    color: colors.textPrimary,
-    flex: 1,
-  },
+  menuItemText: { ...commonStyles.text.body, flex: 1 },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.error,
-    padding: spacing.md,
-    margin: spacing.md,
-    borderRadius: borderRadius.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.lg,
   },
-  signOutText: {
-    ...commonStyles.text.body,
-    fontWeight: typography.fontWeight.semibold,
-    color: '#fff',
-    marginLeft: 8,
-  },
-  versionContainer: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  versionText: {
-    ...commonStyles.text.caption,
-    color: colors.textSecondary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContent: {
-    paddingBottom: spacing.xl,
-  },
-  sectionContainer: {
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
-    ...commonStyles.text.h4,
-    color: colors.textPrimary,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  reviewsContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    marginHorizontal: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+  signOutText: { ...commonStyles.text.body, color: colors.error, fontWeight: 'bold' },
   reviewItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderColor: colors.borderLight,
   },
-  reviewContent: {
-    flex: 1,
+  reviewItemDetails: { flex: 1 },
+  reviewVendorName: { ...commonStyles.text.body, fontWeight: typography.fontWeight.medium },
+  reviewDate: { ...commonStyles.text.caption, color: colors.textSecondary },
+  rateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primaryLight,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
   },
-  reviewVendor: {
+  rateButtonText: { color: colors.primary, fontWeight: typography.fontWeight.semibold },
+  noReviewsText: {
     ...commonStyles.text.body,
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  reviewDate: {
-    ...commonStyles.text.caption,
     color: colors.textSecondary,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: spacing.lg,
   },
   modalContent: {
+    width: '100%',
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: spacing.lg,
+    alignItems: 'center',
   },
-  modalTitle: {
-    ...commonStyles.text.h4,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
+  modalTitle: { ...commonStyles.text.h3, marginBottom: spacing.sm },
+  modalVendorName: {
     ...commonStyles.text.body,
     color: colors.textSecondary,
+    marginBottom: spacing.lg,
     textAlign: 'center',
-    marginBottom: spacing.lg,
   },
-  ratingContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: spacing.lg,
-  },
-  starButton: {
-    marginHorizontal: spacing.xs,
-  },
-  reviewInput: {
+  starContainer: { marginVertical: spacing.lg },
+  input: {
     ...commonStyles.input,
-    minHeight: 100,
+    height: 100,
     textAlignVertical: 'top',
+    paddingTop: spacing.md,
+    width: '100%',
     marginBottom: spacing.lg,
   },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    flex: 1,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButton: {
-    backgroundColor: colors.surfaceSecondary,
-    marginRight: spacing.sm,
-  },
-  submitButton: {
-    backgroundColor: colors.primary,
-    marginLeft: spacing.sm,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  cancelButtonText: {
+  cancelText: {
     ...commonStyles.text.body,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textPrimary,
-  },
-  submitButtonText: {
-    ...commonStyles.text.body,
-    fontWeight: typography.fontWeight.semibold,
-    color: '#fff',
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    padding: spacing.sm,
   },
 });
